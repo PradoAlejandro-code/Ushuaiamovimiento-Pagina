@@ -1,3 +1,6 @@
+// front-jefes/src/api.js
+
+// CAMBIO CRÍTICO: Usamos el dominio real https, no http ni localhost
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.ushuaiamovimiento.com.ar';
 
 const handleResponse = async (response) => {
@@ -6,7 +9,8 @@ const handleResponse = async (response) => {
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('role');
         localStorage.removeItem('user_name');
-        window.location.href = '/login';
+        // Redirigimos al login principal si expira la sesión
+        window.location.href = 'https://ushuaiamovimiento.com.ar/login';
         throw new Error('Sesión expirada');
     }
     if (!response.ok) {
@@ -26,6 +30,8 @@ const getHeaders = () => {
     };
 };
 
+// ... (El resto de tus funciones createSurvey, etc. déjalas igual) ...
+// Solo asegúrate de copiar las exportaciones que ya tenías abajo.
 export const createSurvey = async (payload) => {
     const response = await fetch(`${API_URL}/api/surveys/create/`, {
         method: 'POST',
@@ -122,8 +128,6 @@ export const getGlobalStats = async (period = 'day', groupBy = 'date') => {
     });
     return handleResponse(response);
 };
-
-// --- GESTIÓN DE CONTACTOS (CRUD) ---
 
 export const getContactosDb = async () => {
     const response = await fetch(`${API_URL}/api/surveys/contactos/`, {

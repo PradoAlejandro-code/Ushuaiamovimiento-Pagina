@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import LoginPage from "./pages/LoginPage";
+
 import SurveyViewer from "./pages/SurveyViewer";
 import Home from "./pages/Home";
 
@@ -8,7 +8,7 @@ import Home from "./pages/Home";
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('access_token');
   if (!token) {
-    return <Navigate to="/login" replace />;
+    return (() => { window.location.href = 'https://ushuaiamovimiento.com.ar'; return null; })();
   }
   return children;
 };
@@ -30,7 +30,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+
         <Route path="/" element={
           <ProtectedRoute>
             <Home />

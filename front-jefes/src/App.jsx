@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // <--- IMPORTANTE: useState
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import CreateSurveyPage from './pages/CreateSurveyPage';
@@ -8,13 +8,13 @@ import ContactViewerPage from './pages/ContactViewerPage';
 import RespuestasDashboard from './pages/RespuestasDashboard';
 import DashboardLayout from './layouts/DashboardLayout';
 
-// 2. Protege la ruta: Si no hay token, fuera.
+// Componente que protege la ruta
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem('access_token');
 
-    // Check basico de existencia
+    // Si no hay token, te manda al Login Principal (no al relativo /login)
     if (!token) {
-        window.location.href = 'https://ushuaiamovimiento.com.ar/login';
+        window.location.href = 'https://ushuaiamovimiento.com.ar';
         return null;
     }
 
@@ -22,32 +22,46 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-    // --- LÓGICA DE TOKEN (Solicitada por el usuario) ---
+    // ESTADO DE CARGA: Esto es lo que falta en tu código actual
+    const [loading, setLoading] = useState(true);
+
     useEffect(() => {
-        // 1. Buscamos si hay un token en la URL (?token=...)
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get('token');
+        const capturarToken = () => {
+            // 1. Buscamos el token en la URL
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
 
-        if (token) {
-            // 2. Si existe, lo guardamos para que el resto del front pueda usarlo
-            localStorage.setItem('access_token', token);
+            if (token) {
+                // 2. Si existe, lo guardamos
+                localStorage.setItem('access_token', token);
+                console.log("Token guardado con éxito");
 
-            // 3. Limpiamos la URL (quitamos el ?token=...) para que no quede expuesto
-            window.history.replaceState({}, document.title, window.location.pathname);
+                // 3. Limpiamos la URL visualmente
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
 
-            // Recargamos para limpiar limpio el estado o asegurar auth
-            // (El usuario no lo puso en su snippet, pero en la version anterior estaba. 
-            //  Seguiré su snippet ESTRICTAMENTE como pidió: "Sigue estos paso no inventes nada")
-            //  El snippet del usuario NO tiene reload, solo log.
-            console.log("Token capturado y guardado correctamente.");
-        }
+            // 4. FINALIZAMOS LA CARGA: Ahora sí dejamos que React pinte la pantalla
+            setLoading(false);
+        };
+
+        capturarToken();
     }, []);
-    // ----------------------------------------------------
+
+    // SI ESTÁ CARGANDO, MOSTRAMOS UN MENSAJE Y NO DEJAMOS ENTRAR AL GUARDIA AÚN
+    if (loading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+                <div className="text-xl font-semibold text-gray-600">
+                    Verificando credenciales...
+                </div>
+            </div>
+        );
+    }
 
     return (
         <BrowserRouter>
             <Routes>
-                {/* Rutas con Sidebar (DashboardLayout) */}
+                {/* Rutas con Sidebar */}
                 <Route element={
                     <ProtectedRoute>
                         <DashboardLayout />
@@ -56,7 +70,7 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/create-survey" element={<CreateSurveyPage />} />
 
-                    {/* Nuevas Rutas de Gestión */}
+                    {/* Rutas de Gestión */}
                     <Route path="/relevamiento" element={<EditSurveyPage isRelevamiento={true} />} />
                     <Route path="/surveys" element={<SurveyManagerPage />} />
                     <Route path="/surveys/edit/:id" element={<EditSurveyPage />} />

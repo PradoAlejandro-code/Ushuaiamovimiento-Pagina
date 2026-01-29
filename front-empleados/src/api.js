@@ -16,7 +16,7 @@ const handleResponse = async (response) => {
         localStorage.removeItem('role');
         localStorage.removeItem('user_name');
         localStorage.removeItem('accesos');
-        window.location.href = '/login';
+        window.location.href = 'https://ushuaiamovimiento.com.ar';
 
         throw new Error('Acceso denegado o sesión expirada');
     }
@@ -34,17 +34,7 @@ const handleResponse = async (response) => {
     return response.json();
 };
 
-export const login = async (email, password) => {
-    const response = await fetch(`${API_URL}/api/token/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password })
-    });
-    if (!response.ok) throw new Error('Error de credenciales');
-    return response.json();
-};
+
 
 export const getActiveSurveys = async () => {
     const response = await fetch(`${API_URL}/api/surveys/active/`, {
