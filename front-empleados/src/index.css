@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --color-brand-blue: #1e40af;
+    --color-brand-orange: #f97316;
+
+    --color-surface-primary: var(--bg-primary);
+    /* Para fondos principales */
+    --color-surface-secondary: var(--bg-secondary);
+    /* Para tarjetas/sidebar */
+
+    --color-content-primary: var(--text-primary);
+    /* Para texto principal */
+    --color-content-secondary: var(--text-secondary);
+    /* Para texto secundario */
+
+    --color-border-base: var(--border-color);
+    /* Para bordes */
+}
+
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f4f6;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --border-color: #e2e8f0;
+}
+
+.dark {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --text-primary: #e6edf3;
+    --text-secondary: #7d8590;
+    --border-color: #30363d;
+}
+
+
+@layer base {
+    body {
+        transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    div,
+    nav,
+    aside,
+    section,
+    main,
+    header,
+    footer,
+    button,
+    input,
+    textarea,
+    select {
+        transition-property: background-color, border-color, color;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+    }
+
+    span,
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    svg,
+    label {
+        transition-property: color, fill, stroke;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+    }
+}

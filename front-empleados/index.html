@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>front-empleados</title>
+  <script>
+    (function () {
+      // 1. Buscamos el tema guardado
+      const savedTheme = localStorage.getItem('theme');
+      // 2. Si no hay nada guardado, usamos la preferencia del sistema (opcional)
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      // Decidimos el tema: si existe el guardado lo usamos, si no, intentamos light por defecto
+      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      // OPCIONAL: Evita el parpadeo de color blanco antes de que cargue el CSS
+      // Pero lo ideal es que las variables CSS se encarguen de esto
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

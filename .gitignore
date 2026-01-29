@@ -1,0 +1,55 @@
+# --- SISTEMA / IDEs (General) ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- FRONTENDS (Vite / React / Node) ---
+# Esto ignorará node_modules en CUALQUIER subcarpeta (front1, front2, etc.)
+node_modules/
+
+# Builds de producción de Vite
+dist/
+dist-ssr/
+
+# Archivos de logs de npm/yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos de entorno locales (no subir claves privadas)
+.env.local
+.env.*.local
+
+# --- BACKEND (Django / Python) ---
+# Byte-compiled / Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos Virtuales (ajusta según cómo nombres tu venv)
+venv/
+.venv/
+env/
+ENV/
+
+# Variables de entorno
+.env
+
+# Base de datos local (SQLite)
+db.sqlite3
+*.sqlite3
+
+# Django Static & Media
+# media: archivos subidos por usuarios (no se versionan)
+# staticfiles: donde collectstatic junta todo (no se versiona)
+media/
+staticfiles/
+
+# Pytest / Coverage (si usas tests en el back)
+.coverage
+htmlcov/
+.pytest_cache/
