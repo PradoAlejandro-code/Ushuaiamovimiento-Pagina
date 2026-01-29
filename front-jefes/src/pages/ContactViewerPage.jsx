@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getContactosDb, saveContacto, deleteContacto, importContactos, getSurvey } from "../api";
-import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User } from "lucide-react";
+import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User, Mail, CreditCard } from "lucide-react";
 import Card from '../components/ui/Card';
 
 const ContactViewerPage = () => {
@@ -18,7 +18,7 @@ const ContactViewerPage = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // Form state for Create/Edit
-    const [currentContact, setCurrentContact] = useState({ nombre: '', celular: '', tag: '' });
+    const [currentContact, setCurrentContact] = useState({ nombre: '', celular: '', email: '', dni: '', tag: '' });
     const [saving, setSaving] = useState(false);
 
     // Form state for Import
@@ -56,13 +56,15 @@ const ContactViewerPage = () => {
     const filteredContacts = contacts.filter(c =>
         (c.nombre || "").toLowerCase().includes(filter.toLowerCase()) ||
         (c.tag || "").toLowerCase().includes(filter.toLowerCase()) ||
-        (c.celular || "").includes(filter)
+        (c.celular || "").includes(filter) ||
+        (c.email || "").toLowerCase().includes(filter.toLowerCase()) ||
+        (c.dni || "").includes(filter)
     );
 
     // --- Actions ---
 
     const handleCreateClick = () => {
-        setCurrentContact({ nombre: '', celular: '', tag: 'manual' });
+        setCurrentContact({ nombre: '', celular: '', email: '', dni: '', tag: 'manual' });
         setIsEditModalOpen(true);
     };
 
@@ -140,11 +142,6 @@ const ContactViewerPage = () => {
         setDownloading(true);
         try {
             const token = localStorage.getItem('access_token');
-            // Usamos el endpoint global de exportación si no hay ID, o el de encuesta si lo hay (aunque ahora la lista es global, el export puede ser contextual)
-            // Si queremos exportar LO QUE VEMOS (la tabla), deberíamos apuntar a un export de Contactos.
-            // Asumiremos que el backend tiene un export para contactos. Si no, usamos el fallback.
-            // Por ahora mantenemos la lógica existente o apuntamos a `api/surveys/contactos/exportar/` si existiera.
-            // Usaremos la ruta 'all' antigua que mapeaba a todos.
             const url = id
                 ? `${API_URL}/api/surveys/${id}/exportar-csv/`
                 : `${API_URL}/api/surveys/contactos/all/exportar-csv/`;
@@ -216,7 +213,7 @@ const ContactViewerPage = () => {
                     <Search className="absolute left-3 top-2.5 text-content-secondary" size={18} />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre, tag o celular..."
+                        placeholder="Buscar por nombre, email, tag o celular..."
                         className="w-full pl-10 pr-4 py-2 bg-surface-secondary border border-border-base rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/30 text-content-primary placeholder-content-secondary/50"
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
@@ -244,6 +241,7 @@ const ContactViewerPage = () => {
                             <tr className="bg-surface-secondary border-b border-border-base text-xs font-semibold text-content-secondary uppercase tracking-wider">
                                 <th className="p-4 pl-6">Nombre</th>
                                 <th className="p-4">Teléfono</th>
+                                <th className="p-4">Email / DNI</th>
                                 <th className="p-4">Tag</th>
                                 <th className="p-4 text-right">Actualizado</th>
                                 <th className="p-4 text-right pr-6">Acciones</th>
@@ -252,7 +250,7 @@ const ContactViewerPage = () => {
                         <tbody className="divide-y divide-border-base">
                             {filteredContacts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-12 text-center text-content-secondary">
+                                    <td colSpan={6} className="p-12 text-center text-content-secondary">
                                         {filter ? "No hay resultados para tu búsqueda." : "No se encontraron contactos."}
                                     </td>
                                 </tr>
@@ -282,6 +280,24 @@ const ContactViewerPage = () => {
                                                 >
                                                     <MessageCircle size={16} />
                                                 </a>
+                                            </div>
+                                        </td>
+
+                                        <td className="p-4">
+                                            <div className="flex flex-col text-sm">
+                                                {c.email && (
+                                                    <div className="flex items-center gap-1.5 text-content-primary mb-0.5">
+                                                        <Mail size={12} className="text-content-secondary" />
+                                                        <span>{c.email}</span>
+                                                    </div>
+                                                )}
+                                                {c.dni && (
+                                                    <div className="flex items-center gap-1.5 text-content-secondary">
+                                                        <CreditCard size={12} />
+                                                        <span>{c.dni}</span>
+                                                    </div>
+                                                )}
+                                                {!c.email && !c.dni && <span className="text-content-secondary text-xs italic">Sin datos extra</span>}
                                             </div>
                                         </td>
 
@@ -344,7 +360,7 @@ const ContactViewerPage = () => {
                                         required
                                         className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
                                         placeholder="Juan Pérez"
-                                        value={currentContact.nombre}
+                                        value={currentContact.nombre || ''}
                                         onChange={(e) => setCurrentContact({ ...currentContact, nombre: e.target.value })}
                                     />
                                 </div>
@@ -358,12 +374,42 @@ const ContactViewerPage = () => {
                                         required
                                         className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
                                         placeholder="+54 9 11 1234 5678"
-                                        value={currentContact.celular}
+                                        value={currentContact.celular || ''}
                                         onChange={(e) => setCurrentContact({ ...currentContact, celular: e.target.value })}
                                     />
                                 </div>
                                 <p className="text-xs text-content-secondary mt-1">El número será limpiado y guardado como identificador.</p>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-content-secondary mb-1">Email</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-2.5 text-content-secondary" size={18} />
+                                        <input
+                                            type="email"
+                                            className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
+                                            placeholder="juan@email.com"
+                                            value={currentContact.email || ''}
+                                            onChange={(e) => setCurrentContact({ ...currentContact, email: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-content-secondary mb-1">DNI</label>
+                                    <div className="relative">
+                                        <CreditCard className="absolute left-3 top-2.5 text-content-secondary" size={18} />
+                                        <input
+                                            type="text"
+                                            className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
+                                            placeholder="12345678"
+                                            value={currentContact.dni || ''}
+                                            onChange={(e) => setCurrentContact({ ...currentContact, dni: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-content-secondary mb-1">Tag / Etiqueta</label>
                                 <div className="relative">
@@ -372,7 +418,7 @@ const ContactViewerPage = () => {
                                         type="text"
                                         className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
                                         placeholder="cliente, proveedor, encuesta..."
-                                        value={currentContact.tag}
+                                        value={currentContact.tag || ''}
                                         onChange={(e) => setCurrentContact({ ...currentContact, tag: e.target.value })}
                                     />
                                 </div>
@@ -415,7 +461,7 @@ const ContactViewerPage = () => {
                                 <p className="font-semibold mb-1">Formato Esperado:</p>
                                 <code className="block bg-white/50 p-2 rounded border border-blue-200 text-xs font-mono">
                                     [<br />
-                                    &nbsp;&nbsp;{"{ \"nombre\": \"Juan\", \"celular\": \"11223344\" }"},<br />
+                                    &nbsp;&nbsp;{"{ \"nombre\": \"Juan\", \"celular\": \"11223344\", \"email\": \"...\" }"},<br />
                                     &nbsp;&nbsp;{"{ \"nombre\": \"Ana\", \"celular\": \"55667788\" }"}<br />
                                     ]
                                 </code>

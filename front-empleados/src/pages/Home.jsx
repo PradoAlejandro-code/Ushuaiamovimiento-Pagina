@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import MyButton from '../components/ui/MyButton';
-import SurveyViewer from './SurveyViewer';
 import { ClipboardList, MapPin, Sun, Moon, LogOut } from 'lucide-react';
 import { getActiveSurveys, getRelevamiento } from '../api';
-import Card from '../components/ui/Card'; // Importamos Card
+import Card from '../components/ui/Card';
+import SurveyViewer from './SurveyViewer';
 
 const Home = () => {
-    const navigate = useNavigate();
-    const role = localStorage.getItem('role');
-
+    // ESTADO
     // Tabs state: 'relevamientos' | 'encuestas'
     const [activeTab, setActiveTab] = useState('relevamientos');
 
@@ -26,14 +24,8 @@ const Home = () => {
     const [relevamiento, setRelevamiento] = useState(null);
     const encuestas = surveys.filter(s => s.es_relevamiento === false);
 
-    // Redirection Logic
-    useEffect(() => {
-        if (role === 'admin') {
-            window.location.href = "https://admins.ushuaiamovimiento.com.ar";
-        } else if (role === 'jefe') {
-            window.location.href = "https://jefes.ushuaiamovimiento.com.ar";
-        }
-    }, [role]);
+    // --- ¡ZONA SEGURA! ---
+    // No hay useEffects mirando el 'role'. Aquí eres bienvenido seas Jefe o Empleado.
 
     // Theme Logic Effect
     useEffect(() => {
@@ -47,22 +39,24 @@ const Home = () => {
         setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
 
-    // Fetch Surveys
+    // Data Fetching Logic
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Cargamos datos. Si la API da error, lo capturamos, pero no redirigimos.
                 const [surveysData, relevamientoData] = await Promise.all([
                     getActiveSurveys(),
                     getRelevamiento().catch(() => null)
                 ]);
-                setSurveys(surveysData);
+                setSurveys(surveysData || []);
                 setRelevamiento(relevamientoData);
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error cargando datos:", error);
             } finally {
                 setLoading(false);
             }
         };
+
         fetchData();
     }, []);
 
@@ -71,16 +65,9 @@ const Home = () => {
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('role');
         localStorage.removeItem('user_name');
+        localStorage.removeItem('accesos');
+        // Recargamos y el App.jsx se encargará de mandar al login principal
         window.location.reload();
-    }
-
-    if (role === 'admin' || role === 'jefe') {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-surface-secondary">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue mb-4"></div>
-                <h2 className="text-xl font-semibold text-content-primary">Redirigiendo a tu panel...</h2>
-            </div>
-        );
     }
 
     if (loading) {
@@ -92,7 +79,7 @@ const Home = () => {
     }
 
     return (
-        <div className="min-h-screen bg-surface-secondary pb-20 font-sans">
+        <div className="min-h-screen bg-surface-secondary pb-20 font-sans transition-colors duration-200">
 
             {/* Top Bar: Botones */}
             <div className="sticky top-0 z-20 bg-surface-secondary/95 backdrop-blur-sm pt-4 pb-2 flex justify-center items-center gap-3 border-b border-transparent">
@@ -145,23 +132,25 @@ const Home = () => {
             {/* Content Area */}
             <div className="max-w-md mx-auto mt-6 px-4 space-y-4">
 
-                {activeTab === 'relevamientos' ? (
-                    <div className="-mx-4 md:mx-0">
-                        {relevamiento ? (
-                            <SurveyViewer embeddedId={relevamiento.id} />
-                        ) : (
-                            <div className="text-center py-12 text-content-secondary bg-surface-primary rounded-xl mx-4 shadow-sm border border-dashed border-border-base">
-                                <MapPin size={48} className="mx-auto mb-2 opacity-20" />
-                                <p>No hay relevamientos activos.</p>
-                            </div>
-                        )}
-                    </div>
-                ) : (
+                {/* Tab Relevamientos */}
+                {activeTab === 'relevamientos' && (
+                    relevamiento ? (
+                        <SurveyViewer embeddedId={relevamiento.id} />
+                    ) : (
+                        <div className="text-center py-12 text-content-secondary bg-surface-primary rounded-xl mx-4 shadow-sm border border-dashed border-border-base">
+                            <MapPin size={48} className="mx-auto mb-2 opacity-20" />
+                            <p>No hay relevamientos activos.</p>
+                        </div>
+                    )
+                )}
+
+                {/* Tab Encuestas */}
+                {activeTab === 'encuestas' && (
                     <div>
                         {encuestas.length > 0 ? encuestas.map(item => (
                             <Card key={item.id} className="mb-4 hover:border-brand-blue/30 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-content-primary leading-tight">{item.nombre}</h4>
+                                    <h4 className="font-bold text-content-primary leading-tight">{item.nombre || item.titulo}</h4>
                                     <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-medium border border-emerald-500/20">Activa</span>
                                 </div>
                                 <p className="text-sm text-content-secondary mb-4">{item.descripcion}</p>

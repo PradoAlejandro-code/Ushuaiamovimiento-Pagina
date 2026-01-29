@@ -7,10 +7,14 @@ import QuestionBuilderNumber from "../components/survey/QuestionBuilderNumber";
 import QuestionBuilderOptions from "../components/survey/QuestionBuilderOptions";
 import QuestionBuilderPhoto from "../components/survey/QuestionBuilderPhoto";
 import QuestionBuilderPhone from "../components/survey/QuestionBuilderPhone";
+import QuestionBuilderNombre from "../components/survey/QuestionBuilderNombre";
+import QuestionBuilderCelular from "../components/survey/QuestionBuilderCelular";
+import QuestionBuilderDni from "../components/survey/QuestionBuilderDni";
+import QuestionBuilderMail from "../components/survey/QuestionBuilderMail";
 
 import SurveyTitleCard from "../components/survey/SurveyTitleCard";
 import SurveySettingsCard from "../components/survey/SurveySettingsCard";
-import { Type, Hash, List, Camera, ArrowLeft, Loader, Save, UserPlus, Phone } from 'lucide-react';
+import { Type, Hash, List, Camera, ArrowLeft, Loader, Save, Phone, User, Mail, CreditCard } from 'lucide-react';
 
 const EditSurveyPage = ({ isRelevamiento = false }) => {
     const params = useParams();
@@ -67,39 +71,19 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
         }
     };
 
-    // Macro: Agregar Datos Básicos
-    const addBasicData = () => {
-        const basicFields = [
-            { title: "Nombre y Apellido", type: "texto" },
-            { title: "Calle y Número", type: "texto" },
-            { title: "Teléfono", type: "telefono" }
-        ];
-        const newDrafts = basicFields.map((field, idx) => ({
-            id: `temp-${Date.now() + idx}`,
-            isDraft: true,
-            encuesta: surveyId,
-            titulo: field.title,
-            tipo: field.type,
-            orden: localQuestions.length + 1 + idx,
-            activa: true,
-            obligatoria: true,
-            opciones: null
-        }));
-
-        setLocalQuestions(prev => [...prev, ...newDrafts]);
-
-        setTimeout(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }, 100);
-    };
-
     // Agregar Pregunta (Local Draft)
     const handleAddQuestion = (type) => {
+        let title = "";
+        if (type === 'nombre') title = "Nombre Completo";
+        else if (type === 'dni') title = "DNI";
+        else if (type === 'mail') title = "Email";
+        else if (type === 'celular') title = "Celular";
+
         const newDraft = {
             id: `temp-${Date.now()}`,
             isDraft: true,
             encuesta: surveyId,
-            titulo: "",
+            titulo: title,
             tipo: type,
             orden: localQuestions.length + 1,
             activa: true,
@@ -215,6 +199,10 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
             case 'opciones': return <QuestionBuilderOptions {...commonProps} />;
             case 'foto': return <QuestionBuilderPhoto {...commonProps} />;
             case 'telefono': return <QuestionBuilderPhone {...commonProps} />;
+            case 'nombre': return <QuestionBuilderNombre {...commonProps} />;
+            case 'celular': return <QuestionBuilderCelular {...commonProps} />;
+            case 'dni': return <QuestionBuilderDni {...commonProps} />;
+            case 'mail': return <QuestionBuilderMail {...commonProps} />;
             default: return null;
         }
     };
@@ -282,46 +270,48 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
 
             {/* Barra Inferior Sticky */}
             {/* Adaptado: bg-surface-secondary, bordes, opacidades en hover */}
-            <div className="sticky bottom-6 mx-auto w-fit bg-surface-secondary px-2 py-1 rounded-2xl shadow-2xl border border-border-base flex items-center gap-1 z-50 ring-1 ring-black/5 dark:ring-white/10 mt-10">
+            <div className="sticky bottom-6 mx-auto w-fit bg-surface-secondary px-2 py-1 rounded-2xl shadow-2xl border border-border-base flex items-center gap-1 z-50 ring-1 ring-black/5 dark:ring-white/10 mt-10 overflow-x-auto max-w-[95vw]">
 
-                <button onClick={addBasicData} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-blue-500/10 text-content-secondary hover:text-blue-500 group min-w-[60px]" title="Agregar Datos Básicos">
-                    <UserPlus size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Datos</span>
-                </button>
+                {/* Contact Types Group */}
+                <div className="flex items-center gap-1 bg-surface-tertiary/50 p-1 rounded-xl">
+                    <button onClick={() => handleAddQuestion('nombre')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-blue-500/10 text-content-secondary hover:text-blue-500 transition-all group min-w-[60px]" title="Nombre">
+                        <User size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium">Nombre</span>
+                    </button>
+                    <button onClick={() => handleAddQuestion('celular')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-green-600/10 text-content-secondary hover:text-green-600 transition-all group min-w-[60px]" title="Celular">
+                        <Phone size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium">Celular</span>
+                    </button>
+                    <button onClick={() => handleAddQuestion('dni')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-cyan-600/10 text-content-secondary hover:text-cyan-600 transition-all group min-w-[60px]" title="DNI">
+                        <CreditCard size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium">DNI</span>
+                    </button>
+                    <button onClick={() => handleAddQuestion('mail')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-yellow-500/10 text-content-secondary hover:text-yellow-500 transition-all group min-w-[60px]" title="Mail">
+                        <Mail size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium">Mail</span>
+                    </button>
+                </div>
 
                 <div className="w-px h-8 bg-border-base mx-1"></div>
 
                 <button onClick={() => handleAddQuestion('texto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-brand-blue/10 text-content-secondary hover:text-brand-blue min-w-[60px]" title="Texto">
-                    <Type size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Texto</span>
+                    <Type size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium">Texto</span>
                 </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
 
                 <button onClick={() => handleAddQuestion('numero')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-emerald-500/10 text-content-secondary hover:text-emerald-500 min-w-[60px]" title="Numérico">
-                    <Hash size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Num</span>
+                    <Hash size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium">Num</span>
                 </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
 
                 <button onClick={() => handleAddQuestion('opciones')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-purple-500/10 text-content-secondary hover:text-purple-500 min-w-[60px]" title="Opciones">
-                    <List size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Opción</span>
+                    <List size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium">Opción</span>
                 </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
 
                 <button onClick={() => handleAddQuestion('foto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-pink-500/10 text-content-secondary hover:text-pink-500 min-w-[60px]" title="Foto">
-                    <Camera size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Foto</span>
-                </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
-
-                <button onClick={() => handleAddQuestion('telefono')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-green-500/10 text-content-secondary hover:text-green-500 min-w-[60px]" title="Teléfono">
-                    <Phone size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium">Tel</span>
+                    <Camera size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium">Foto</span>
                 </button>
             </div>
         </div>

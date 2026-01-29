@@ -29,13 +29,22 @@ class Pregunta(models.Model):
     TIPO_OPCIONES = 'opciones'
     TIPO_TELEFONO = 'telefono'
     TIPO_FOTO = 'foto'
+    # Nuevos tipos para extracción de datos
+    TIPO_NOMBRE = 'nombre'
+    TIPO_CELULAR = 'celular'
+    TIPO_DNI = 'dni'
+    TIPO_MAIL = 'mail'
 
     TIPO_CHOICES = [
         (TIPO_TEXTO, 'Texto Libre'),
         (TIPO_NUMERO, 'Numérico'),
         (TIPO_OPCIONES, 'Opciones'),
-        (TIPO_TELEFONO, 'Teléfono (+54)'),
+        (TIPO_TELEFONO, 'Teléfono (Legacy)'),
         (TIPO_FOTO, 'Foto'),
+        (TIPO_NOMBRE, 'Nombre Completo'),
+        (TIPO_CELULAR, 'Celular'),
+        (TIPO_DNI, 'DNI'),
+        (TIPO_MAIL, 'Email'),
     ]
 
     encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name='preguntas')
@@ -56,6 +65,8 @@ class Pregunta(models.Model):
 class Contacto(models.Model):
     nombre = models.CharField(max_length=255)
     celular = models.CharField(max_length=20, unique=True) # El celular es el identificador único
+    email = models.EmailField(null=True, blank=True)
+    dni = models.CharField(max_length=20, null=True, blank=True)
     tag = models.CharField(max_length=50, default="encuesta")
     ultima_actualizacion = models.DateTimeField(auto_now=True)
 

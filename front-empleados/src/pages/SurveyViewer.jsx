@@ -230,6 +230,10 @@ const SurveyViewer = ({ embeddedId }) => {
                                             case 'opciones': return <QuestionViewerOptions question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'foto': return <QuestionViewerPhoto question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'telefono': return <QuestionViewerPhone question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
+                                            case 'celular': return <QuestionViewerPhone question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
+                                            case 'nombre': return <QuestionViewerText question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
+                                            case 'dni': return <QuestionViewerText question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
+                                            case 'mail': return <QuestionViewerText question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             default: return null;
                                         }
                                     })()}

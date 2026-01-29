@@ -8,7 +8,12 @@ import QuestionBuilderNumber from "../components/survey/QuestionBuilderNumber";
 import QuestionBuilderOptions from "../components/survey/QuestionBuilderOptions";
 import QuestionBuilderPhoto from "../components/survey/QuestionBuilderPhoto";
 import QuestionBuilderPhone from "../components/survey/QuestionBuilderPhone";
-import { Type, Hash, List, UserPlus, Camera, Save, Phone } from 'lucide-react';
+import QuestionBuilderNombre from "../components/survey/QuestionBuilderNombre";
+import QuestionBuilderCelular from "../components/survey/QuestionBuilderCelular";
+import QuestionBuilderDni from "../components/survey/QuestionBuilderDni";
+import QuestionBuilderMail from "../components/survey/QuestionBuilderMail";
+
+import { Type, Hash, List, Camera, Save, Phone, User, Mail, CreditCard } from 'lucide-react';
 import { createSurvey } from '../api';
 
 const CreateSurveyPage = () => {
@@ -28,37 +33,26 @@ const CreateSurveyPage = () => {
 
     // Agregar nueva pregunta
     const addQuestion = (type, defaultTitle = "") => {
+        let title = defaultTitle;
+        if (!title) {
+            switch (type) {
+                case 'nombre': title = "Nombre Completo"; break;
+                case 'dni': title = "DNI"; break;
+                case 'mail': title = "Email"; break;
+                case 'celular': title = "Celular"; break;
+                default: title = "";
+            }
+        }
+
         const newQuestion = {
             id: Date.now() + Math.random(),
             tipo: type,
-            titulo: defaultTitle,
+            titulo: title,
             orden: questions.length + 1,
             obligatoria: false,
             opciones: type === 'opciones' ? ["Si", "No"] : null
         };
         setQuestions(prev => [...prev, newQuestion]);
-
-        setTimeout(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }, 100);
-    };
-
-    // Macro: Agregar Datos Básicos
-    const addBasicData = () => {
-        const basicFields = [
-            { title: "Nombre y Apellido", type: "texto" },
-            { title: "Calle y Número", type: "texto" },
-            { title: "Teléfono", type: "telefono" }
-        ];
-        const newQuestions = basicFields.map((field, idx) => ({
-            id: Date.now() + idx,
-            tipo: field.type,
-            titulo: field.title,
-            orden: questions.length + 1 + idx,
-            obligatoria: true,
-            opciones: null
-        }));
-        setQuestions(prev => [...prev, ...newQuestions]);
 
         setTimeout(() => {
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -108,17 +102,17 @@ const CreateSurveyPage = () => {
 
     // Renderizar Pregunta según Tipo
     const renderQuestion = (q) => {
+        const commonProps = { key: q.id, question: q, onChange: (val) => updateQuestion(q.id, val), onDelete: () => deleteQuestion(q.id) };
         switch (q.tipo) {
-            case 'texto':
-                return <QuestionBuilderText key={q.id} question={q} onChange={(val) => updateQuestion(q.id, val)} onDelete={() => deleteQuestion(q.id)} />;
-            case 'numero':
-                return <QuestionBuilderNumber key={q.id} question={q} onChange={(val) => updateQuestion(q.id, val)} onDelete={() => deleteQuestion(q.id)} />;
-            case 'opciones':
-                return <QuestionBuilderOptions key={q.id} question={q} onChange={(val) => updateQuestion(q.id, val)} onDelete={() => deleteQuestion(q.id)} />;
-            case 'foto':
-                return <QuestionBuilderPhoto key={q.id} question={q} onChange={(val) => updateQuestion(q.id, val)} onDelete={() => deleteQuestion(q.id)} />;
-            case 'telefono':
-                return <QuestionBuilderPhone key={q.id} question={q} onChange={(val) => updateQuestion(q.id, val)} onDelete={() => deleteQuestion(q.id)} />;
+            case 'texto': return <QuestionBuilderText {...commonProps} />;
+            case 'numero': return <QuestionBuilderNumber {...commonProps} />;
+            case 'opciones': return <QuestionBuilderOptions {...commonProps} />;
+            case 'foto': return <QuestionBuilderPhoto {...commonProps} />;
+            case 'telefono': return <QuestionBuilderPhone {...commonProps} />; // Legacy or specific
+            case 'nombre': return <QuestionBuilderNombre {...commonProps} />;
+            case 'celular': return <QuestionBuilderCelular {...commonProps} />;
+            case 'dni': return <QuestionBuilderDni {...commonProps} />;
+            case 'mail': return <QuestionBuilderMail {...commonProps} />;
             default: return null;
         }
     };
@@ -126,7 +120,6 @@ const CreateSurveyPage = () => {
     return (
         <div className="max-w-3xl mx-auto pb-32 pt-6 relative min-h-screen">
             {/* Header Sticky */}
-            {/* Adaptado: bg-surface-primary con transparencia */}
             <div className="flex justify-between items-center mb-6 sticky top-0 bg-surface-primary/95 backdrop-blur-sm z-40 py-4 shadow-sm -mx-4 px-4 md:static md:mx-auto md:shadow-none md:p-0 md:bg-transparent rounded-b-xl border-b border-border-base md:border-none">
                 <div className="flex items-center gap-2">
                     <h1 className="text-2xl font-bold text-content-primary">Crear Nueva Encuesta</h1>
@@ -134,7 +127,6 @@ const CreateSurveyPage = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Adaptado: Usa bg-brand-blue */}
                     <MyButton onClick={handleSave} className="!w-auto bg-brand-blue text-white hover:bg-brand-blue/90 py-2 px-6 shadow-md shadow-blue-900/20 flex items-center gap-2">
                         <Save size={20} />
                         <span>Guardar</span>
@@ -160,7 +152,6 @@ const CreateSurveyPage = () => {
 
             <div className="mb-8 space-y-6">
                 {questions.length === 0 ? (
-                    // Adaptado: bg-surface-secondary, border-border-base, text-content-secondary
                     <div className="text-center py-12 border-2 border-dashed border-border-base rounded-xl bg-surface-secondary flex flex-col items-center justify-center text-content-secondary">
                         <Type size={48} className="mb-4 opacity-20 text-content-primary" />
                         <p className="font-medium">No hay preguntas aún.</p>
@@ -172,47 +163,49 @@ const CreateSurveyPage = () => {
             </div>
 
             {/* Barra Inferior Sticky (Toolbar) */}
-            {/* Adaptado: bg-surface-secondary, bordes y textos dinámicos */}
-            <div className="sticky bottom-6 mx-auto w-fit bg-surface-secondary px-2 py-1 rounded-2xl shadow-2xl border border-border-base flex items-center gap-1 z-50 ring-1 ring-black/5 dark:ring-white/10 mt-10">
+            <div className="sticky bottom-6 mx-auto w-fit bg-surface-secondary px-2 py-1 rounded-2xl shadow-2xl border border-border-base flex items-center gap-1 z-50 ring-1 ring-black/5 dark:ring-white/10 mt-10 overflow-x-auto max-w-[95vw]">
 
-                <button onClick={addBasicData} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-blue-500/10 text-content-secondary hover:text-blue-500 transition-all group min-w-[70px]" title="Agregar Datos Básicos">
-                    <UserPlus size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Datos</span>
-                </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
-
-                <button onClick={() => addQuestion('texto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-brand-blue/10 text-content-secondary hover:text-brand-blue transition-all group min-w-[70px]" title="Texto Libre">
-                    <Type size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Texto</span>
-                </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
-
-                <button onClick={() => addQuestion('numero')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-emerald-500/10 text-content-secondary hover:text-emerald-500 transition-all group min-w-[70px]" title="Numérico">
-                    <Hash size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Num</span>
-                </button>
-
-                <div className="w-px h-8 bg-border-base mx-1"></div>
-
-                <button onClick={() => addQuestion('opciones')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-purple-500/10 text-content-secondary hover:text-purple-500 transition-all group min-w-[70px]" title="Opciones">
-                    <List size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Opción</span>
-                </button>
+                {/* Contact Types Group */}
+                <div className="flex items-center gap-1 bg-surface-tertiary/50 p-1 rounded-xl">
+                    <button onClick={() => addQuestion('nombre')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-blue-500/10 text-content-secondary hover:text-blue-500 transition-all group min-w-[60px]" title="Nombre">
+                        <User size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium opacity-100">Nombre</span>
+                    </button>
+                    <button onClick={() => addQuestion('celular')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-green-600/10 text-content-secondary hover:text-green-600 transition-all group min-w-[60px]" title="Celular">
+                        <Phone size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium opacity-100">Celular</span>
+                    </button>
+                    <button onClick={() => addQuestion('dni')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-cyan-600/10 text-content-secondary hover:text-cyan-600 transition-all group min-w-[60px]" title="DNI">
+                        <CreditCard size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium opacity-100">DNI</span>
+                    </button>
+                    <button onClick={() => addQuestion('mail')} className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-yellow-500/10 text-content-secondary hover:text-yellow-500 transition-all group min-w-[60px]" title="Mail">
+                        <Mail size={20} strokeWidth={1.5} />
+                        <span className="text-[9px] font-medium opacity-100">Mail</span>
+                    </button>
+                </div>
 
                 <div className="w-px h-8 bg-border-base mx-1"></div>
 
-                <button onClick={() => addQuestion('foto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-pink-500/10 text-content-secondary hover:text-pink-500 transition-all group min-w-[70px]" title="Foto">
-                    <Camera size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Foto</span>
+                {/* Standard Types Group */}
+                <button onClick={() => addQuestion('texto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-brand-blue/10 text-content-secondary hover:text-brand-blue transition-all group min-w-[60px]" title="Texto Libre">
+                    <Type size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium opacity-100">Texto</span>
                 </button>
 
-                <div className="w-px h-8 bg-border-base mx-1"></div>
+                <button onClick={() => addQuestion('numero')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-emerald-500/10 text-content-secondary hover:text-emerald-500 transition-all group min-w-[60px]" title="Numérico">
+                    <Hash size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium opacity-100">Num</span>
+                </button>
 
-                <button onClick={() => addQuestion('telefono')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-green-500/10 text-content-secondary hover:text-green-500 transition-all group min-w-[70px]" title="Teléfono">
-                    <Phone size={22} strokeWidth={1.5} />
-                    <span className="text-[10px] font-medium opacity-100">Tel</span>
+                <button onClick={() => addQuestion('opciones')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-purple-500/10 text-content-secondary hover:text-purple-500 transition-all group min-w-[60px]" title="Opciones">
+                    <List size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium opacity-100">Opción</span>
+                </button>
+
+                <button onClick={() => addQuestion('foto')} className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-pink-500/10 text-content-secondary hover:text-pink-500 transition-all group min-w-[60px]" title="Foto">
+                    <Camera size={20} strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium opacity-100">Foto</span>
                 </button>
             </div>
         </div>

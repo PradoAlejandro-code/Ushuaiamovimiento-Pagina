@@ -1,4 +1,27 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// front-empleados/src/api.js
+
+// URL Real del Backend
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.ushuaiamovimiento.com.ar';
+
+export const handleResponse = async (response) => {
+    // Si el token falló (401) o no tiene permiso (403)
+    if (response.status === 401 || response.status === 403) {
+        // Borramos todo
+        localStorage.clear();
+        // Lo mandamos al Login Principal (Portero)
+        window.location.href = 'https://ushuaiamovimiento.com.ar';
+        throw new Error('Sesión expirada o sin permiso');
+    }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Error en la petición');
+    }
+
+    if (response.status === 204) return null;
+
+    return response.json();
+};
 
 const getHeaders = () => {
     const token = localStorage.getItem('access_token');
@@ -8,33 +31,18 @@ const getHeaders = () => {
     };
 };
 
-const handleResponse = async (response) => {
-    if (response.status === 401 || response.status === 403) {
-        // Limpiamos todo rastro del usuario
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user_name');
-        localStorage.removeItem('accesos');
-        window.location.href = 'https://ushuaiamovimiento.com.ar';
+// --- TUS FUNCIONES DE API ---
 
-        throw new Error('Acceso denegado o sesión expirada');
-    }
-
-    if (!response.ok) {
-        let errorMessage = 'Error en la petición';
-        try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorData.details || JSON.stringify(errorData) || errorMessage;
-        } catch (e) {
-
-        }
-        throw new Error(errorMessage);
-    }
+export const login = async (email, password) => {
+    const response = await fetch(`${API_URL}/api/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
+    // Nota: El login aquí devuelve los tokens directos
+    if (!response.ok) throw new Error('Credenciales inválidas');
     return response.json();
 };
-
-
 
 export const getActiveSurveys = async () => {
     const response = await fetch(`${API_URL}/api/surveys/active/`, {
