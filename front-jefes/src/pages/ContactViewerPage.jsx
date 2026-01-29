@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getContactosDb, saveContacto, deleteContacto, importContactos, getSurvey } from "../api";
 import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User, Mail, CreditCard } from "lucide-react";
 import Card from '../components/ui/Card';
+import WhatsAppQRButton from '../components/ui/WhatsAppQRButton';
 
 const ContactViewerPage = () => {
     const { id } = useParams(); // ID de la encuesta, si venimos de una
@@ -22,7 +23,7 @@ const ContactViewerPage = () => {
     const [saving, setSaving] = useState(false);
 
     // Form state for Import
-    const [importData, setImportData] = useState('');
+    const [importData, setImportData] = useState(null);
     const [importTag, setImportTag] = useState('importado');
     const [importing, setImporting] = useState(false);
 
@@ -107,56 +108,74 @@ const ContactViewerPage = () => {
 
     const handleImportContacts = async (e) => {
         e.preventDefault();
+        if (!importData) {
+            alert("Selecciona un archivo CSV.");
+            return;
+        }
         setImporting(true);
+
         try {
-            let parsedData;
-            try {
-                parsedData = JSON.parse(importData);
-            } catch (err) {
-                alert("El JSON no es válido.");
-                setImporting(false);
-                return;
-            }
+            // Enviamos el archivo directamente al backend
+            const result = await importContactos(importData, importTag);
 
-            if (!Array.isArray(parsedData)) {
-                alert("El JSON debe ser una lista de objetos.");
-                setImporting(false);
-                return;
-            }
+            alert(result.message); // El backend devuelve "message" con el resumen
 
-            const result = await importContactos(parsedData, importTag);
-            alert(`Importación completada: ${result.creados} creados, ${result.actualizados} actualizados.`);
             setIsImportModalOpen(false);
-            setImportData('');
-            loadData(); // Reload list
+            setImportData(null);
+            loadData();
         } catch (error) {
             console.error("Error importing", error);
-            alert("Hubo un error en la importación.");
+            alert("Hubo un error en la importación: " + error.message);
         } finally {
             setImporting(false);
         }
     };
 
     const [downloading, setDownloading] = useState(false);
-    const handleDownload = async () => {
+    const handleDownload = () => {
         setDownloading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            const url = id
-                ? `${API_URL}/api/surveys/${id}/exportar-csv/`
-                : `${API_URL}/api/surveys/contactos/all/exportar-csv/`;
+            // Google Contacts CSV Format headers
+            const headers = [
+                "Name",
+                "Given Name",
+                "Phone 1 - Type",
+                "Phone 1 - Value",
+                "E-mail 1 - Type",
+                "E-mail 1 - Value",
+                "Organization 1 - Name", // Usamos Organization para el Tag
+                "Notes" // Usamos Notes para DNI
+            ];
 
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            // Helper to escape CSV fields
+            const escapeCsv = (text) => {
+                if (!text) return "";
+                const stringText = String(text);
+                if (stringText.includes(",") || stringText.includes('"') || stringText.includes("\n")) {
+                    return `"${stringText.replace(/"/g, '""')}"`;
+                }
+                return stringText;
+            };
+
+            const rows = filteredContacts.map(c => {
+                return [
+                    escapeCsv(c.nombre), // Name
+                    escapeCsv(c.nombre), // Given Name (repetimos para asegurar)
+                    "Mobile", // Phone 1 - Type
+                    escapeCsv(c.celular), // Phone 1 - Value
+                    "Home", // E-mail 1 - Type
+                    escapeCsv(c.email), // E-mail 1 - Value
+                    escapeCsv(c.tag), // Organization as Tag
+                    escapeCsv(c.dni ? `DNI: ${c.dni}` : "") // Notes
+                ].join(",");
             });
 
-            if (!response.ok) throw new Error("Error al descargar");
-
-            const blob = await response.blob();
+            const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n"); // Add BOM for Excel/UTF-8
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `contactos_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.download = `google_contacts_${new Date().toISOString().slice(0, 10)}.csv`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -164,7 +183,7 @@ const ContactViewerPage = () => {
 
         } catch (error) {
             console.error("Falló la descarga:", error);
-            alert("No se pudo descargar el archivo.");
+            alert("No se pudo generar el archivo.");
         } finally {
             setDownloading(false);
         }
@@ -195,7 +214,7 @@ const ContactViewerPage = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-surface-secondary border border-border-base text-content-primary rounded-lg hover:bg-surface-tertiary transition-colors"
                     >
                         <Upload size={18} />
-                        <span className="hidden md:inline">Importar JSON</span>
+                        <span className="hidden md:inline">Importar CSV</span>
                     </button>
                     <button
                         onClick={handleCreateClick}
@@ -269,17 +288,21 @@ const ContactViewerPage = () => {
                                         </td>
 
                                         <td className="p-4">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
                                                 <span className="text-content-primary font-mono text-sm">{c.celular}</span>
                                                 <a
                                                     href={`https://wa.me/${c.celular.replace(/\D/g, '')}`}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 opacity-70 group-hover:opacity-100 transition-opacity"
-                                                    title="Abrir WhatsApp"
+                                                    title="Abrir WhatsApp Web"
                                                 >
                                                     <MessageCircle size={16} />
                                                 </a>
+                                                <WhatsAppQRButton
+                                                    phoneNumber={c.celular}
+                                                    name={c.nombre}
+                                                />
                                             </div>
                                         </td>
 
@@ -451,42 +474,54 @@ const ContactViewerPage = () => {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-surface-primary rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="p-4 border-b border-border-base flex justify-between items-center bg-surface-secondary">
-                            <h2 className="text-lg font-bold text-content-primary">Importar Contactos (JSON)</h2>
+                            <h2 className="text-lg font-bold text-content-primary">Importar Contactos (CSV Google)</h2>
                             <button onClick={() => setIsImportModalOpen(false)} className="text-content-secondary hover:text-content-primary">
                                 <X size={20} />
                             </button>
                         </div>
                         <form onSubmit={handleImportContacts} className="p-6 space-y-4">
-                            <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm text-blue-800">
-                                <p className="font-semibold mb-1">Formato Esperado:</p>
-                                <code className="block bg-white/50 p-2 rounded border border-blue-200 text-xs font-mono">
-                                    [<br />
-                                    &nbsp;&nbsp;{"{ \"nombre\": \"Juan\", \"celular\": \"11223344\", \"email\": \"...\" }"},<br />
-                                    &nbsp;&nbsp;{"{ \"nombre\": \"Ana\", \"celular\": \"55667788\" }"}<br />
-                                    ]
-                                </code>
-                            </div>
-
                             <div>
                                 <label className="block text-sm font-medium text-content-secondary mb-1">Tag para estos importados</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 outline-none bg-surface-primary text-content-primary"
-                                    value={importTag}
-                                    onChange={(e) => setImportTag(e.target.value)}
-                                />
+                                <div className="relative">
+                                    <Tag className="absolute left-3 top-2.5 text-content-secondary" size={18} />
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 outline-none bg-surface-primary text-content-primary"
+                                        value={importTag}
+                                        onChange={(e) => setImportTag(e.target.value)}
+                                        placeholder="ej: lote-enero"
+                                    />
+                                </div>
+                                <p className="text-xs text-content-secondary mt-1">Este tag sobrescribirá el campo 'Organization' del CSV si se deja vacío, o se usará como fallback.</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Datos JSON</label>
-                                <textarea
-                                    required
-                                    rows={6}
-                                    className="w-full px-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 outline-none bg-surface-primary text-content-primary font-mono text-xs"
-                                    placeholder='[{ "nombre": "...", "celular": "..." }]'
-                                    value={importData}
-                                    onChange={(e) => setImportData(e.target.value)}
-                                />
+                                <label className="block text-sm font-medium text-content-secondary mb-1">Archivo CSV</label>
+                                <div className="flex items-center justify-center w-full">
+                                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border-base border-dashed rounded-lg cursor-pointer bg-surface-secondary hover:bg-surface-tertiary transition-colors">
+                                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                            <Upload className="w-8 h-8 mb-4 text-content-secondary" />
+                                            <p className="mb-2 text-sm text-content-secondary"><span className="font-semibold">Click para subir</span> o arrastra</p>
+                                            <p className="text-xs text-content-secondary">CSV de Google Contacts</p>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files[0]) {
+                                                    setImportData(e.target.files[0]);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                                {importData && (
+                                    <p className="text-sm text-emerald-600 mt-2 font-medium flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                                        Archivo seleccionado: {importData.name}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex gap-3 pt-2">
@@ -499,8 +534,8 @@ const ContactViewerPage = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={importing}
-                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex justify-center items-center gap-2"
+                                    disabled={importing || !importData}
+                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {importing ? <Loader size={18} className="animate-spin" /> : <Upload size={18} />}
                                     Importar

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { procesarDatosParaGraficos, procesarParticipacionPorUsuario } from '../utils/analyticsHelpers';
 import ChartCard from '../components/Analytics/ChartCard';
-import { getAllSurveys, getSurvey, getSurveyResponses } from '../api';
-import { ArrowLeft, Loader, FileText, Calendar, Download, ChevronDown, ChevronUp, Eye, ChevronLeft, ChevronRight, X, MapPin, User } from 'lucide-react';
+import { getAllSurveys, getSurvey, getSurveyResponses, updateResponse } from '../api';
+import {
+    ArrowLeft, Loader, FileText, Calendar, Download, ChevronLeft, ChevronRight,
+    X, MapPin, User, Edit2, Save, Eye
+} from 'lucide-react';
 import Card from '../components/ui/Card';
+import ImageCarousel from '../components/ui/ImageCarousel';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -24,9 +28,29 @@ export default function RespuestasDashboard() {
     const [expandedRow, setExpandedRow] = useState(null);
     const [selectedResponse, setSelectedResponse] = useState(null);
 
+    // Estado para Edición
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({ seccion: '', barrio: '', respuestas: {} });
+    const [photosToDelete, setPhotosToDelete] = useState([]);
+    const [saving, setSaving] = useState(false);
+
     // --- CONFIGURACIÓN DE PAGINACIÓN ---
     const [paginaActual, setPaginaActual] = useState(1);
-    const respuestasPorPagina = 10; // Mostramos 10 por página en la tabla
+    const respuestasPorPagina = 10;
+
+    // Helper para texto compacto
+    const CompactText = ({ text }) => {
+        const [expanded, setExpanded] = useState(false);
+        if (!text || String(text).length < 60) return <span>{text}</span>;
+        return (
+            <div>
+                {expanded ? text : String(text).slice(0, 60) + "..."}
+                <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }} className="text-xs text-brand-blue ml-1 hover:underline font-medium">
+                    {expanded ? "ver menos" : "ver más"}
+                </button>
+            </div>
+        )
+    };
 
     useEffect(() => {
         fetchSurveys();
@@ -34,7 +58,6 @@ export default function RespuestasDashboard() {
 
     const getSecureUrl = (url) => {
         if (!url) return "";
-        // Si el backend manda http por error pero estamos en https, forzamos https
         if (url.startsWith('http://api.ushuaiamovimiento.com.ar')) {
             return url.replace('http://', 'https://');
         }
@@ -59,7 +82,8 @@ export default function RespuestasDashboard() {
         setLoadingDetalle(true);
         setEncuestaSeleccionada(idEncuesta);
         setExpandedRow(null);
-        setPaginaActual(1); // Importante: Resetear a página 1 al cambiar de encuesta
+        setPaginaActual(1);
+        setIsEditing(false);
 
         try {
             const [encuestaData, respuestasData] = await Promise.all([
@@ -81,7 +105,6 @@ export default function RespuestasDashboard() {
             setPreguntas(preguntasData);
             setRespuestas(responsesList);
 
-            // Procesar gráficos
             const datosProcesados = procesarDatosParaGraficos(preguntasData, responsesList);
             if (respuestasData.length > 0) {
                 const datosParticipacion = procesarParticipacionPorUsuario(respuestasData);
@@ -97,6 +120,47 @@ export default function RespuestasDashboard() {
             setEncuestaSeleccionada(null);
         } finally {
             setLoadingDetalle(false);
+        }
+    };
+
+    // --- LÓGICA DE PAGINACIÓN ---
+    const indexOfLast = paginaActual * respuestasPorPagina;
+    const indexOfFirst = indexOfLast - respuestasPorPagina;
+    const respuestasPaginadas = respuestas.slice(indexOfFirst, indexOfLast);
+    const totalPaginas = Math.ceil(respuestas.length / respuestasPorPagina);
+
+    // --- LÓGICA DE EDICIÓN ---
+    const handleEditClick = () => {
+        setIsEditing(true);
+        // Inicializar el formulario con los datos actuales
+        const initialRespuestas = {};
+        selectedResponse.detalles.forEach(d => {
+            initialRespuestas[d.pregunta] = d.valor_texto || d.valor_numero || "";
+        });
+
+        setEditForm({
+            seccion: selectedResponse.seccion || "",
+            barrio: selectedResponse.barrio || "",
+            respuestas: initialRespuestas
+        });
+        setPhotosToDelete([]);
+    };
+
+    const handleSaveResponse = async () => {
+        setSaving(true);
+        try {
+            await updateResponse(selectedResponse.id, editForm, photosToDelete);
+            alert("Respuesta actualizada correctamente");
+
+            // Recargar datos para ver cambios
+            await verDetalleEncuesta(encuestaSeleccionada);
+            setSelectedResponse(null);
+            setIsEditing(false);
+        } catch (error) {
+            console.error("Error guardando:", error);
+            alert("Error al guardar los cambios.");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -125,63 +189,56 @@ export default function RespuestasDashboard() {
         }
     };
 
-    const toggleRow = (id) => {
-        setExpandedRow(expandedRow === id ? null : id);
-    };
-
-    // --- CÁLCULO DE PAGINACIÓN ---
-    const indexOfLast = paginaActual * respuestasPorPagina;
-    const indexOfFirst = indexOfLast - respuestasPorPagina;
-    const respuestasPaginadas = respuestas.slice(indexOfFirst, indexOfLast);
-    const totalPaginas = Math.ceil(respuestas.length / respuestasPorPagina);
-
-    if (loading) return <div className="flex justify-center p-20"><Loader className="animate-spin text-brand-blue" /></div>;
-
+    // --- RENDERIZADO PRINCIPAL ---
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-8 min-h-screen">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 min-h-screen">
             {vista === 'lista' ? (
                 /* VISTA DE SELECCIÓN DE ENCUESTA */
                 <div>
                     <h1 className="text-2xl font-bold mb-6 text-content-primary">Panel de Resultados</h1>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Relevamientos */}
-                        {encuestas.filter(e => e.es_relevamiento).map(encuesta => (
-                            <Card
-                                key={encuesta.id}
-                                onClick={() => verDetalleEncuesta(encuesta.id)}
-                                className="!bg-brand-blue !border-brand-blue cursor-pointer group !text-white"
-                            >
-                                <div className="flex justify-between items-start">
-                                    <h3 className="text-xl font-bold">📍 {encuesta.nombre}</h3>
-                                    <FileText size={20} className="opacity-70 group-hover:opacity-100" />
-                                </div>
-                                <p className="mt-2 opacity-90 text-sm">{encuesta.descripcion || "Relevamiento Principal"}</p>
-                                <div className="mt-4 text-xs bg-white/20 inline-block px-3 py-1 rounded-full backdrop-blur-sm">
-                                    {encuesta.fecha_creacion ? new Date(encuesta.fecha_creacion).toLocaleDateString() : 'Sin Fecha'}
-                                </div>
-                            </Card>
-                        ))}
-                        {/* Encuestas Normales */}
-                        {encuestas.filter(e => !e.es_relevamiento).sort((a, b) => b.id - a.id).map(encuesta => (
-                            <Card
-                                key={encuesta.id}
-                                onClick={() => verDetalleEncuesta(encuesta.id)}
-                                className="cursor-pointer group hover:border-brand-blue/50"
-                            >
-                                <div className="flex justify-between items-start">
-                                    <h3 className="text-lg font-bold text-content-primary group-hover:text-brand-blue">{encuesta.nombre}</h3>
-                                    <FileText size={20} className="text-content-secondary group-hover:text-brand-blue/70" />
-                                </div>
-                                <p className="text-sm text-content-secondary mt-2 line-clamp-2 min-h-[2.5rem]">
-                                    {encuesta.descripcion || "Sin descripción"}
-                                </p>
-                                <div className="flex items-center gap-2 mt-4 text-xs text-content-secondary/70">
-                                    <Calendar size={12} />
-                                    {encuesta.fecha_creacion ? new Date(encuesta.fecha_creacion).toLocaleDateString() : 'Sin Fecha'}
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
+                    {loading ? (
+                        <div className="flex justify-center p-20"><Loader className="animate-spin text-brand-blue" /></div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Relevamientos */}
+                            {encuestas.filter(e => e.es_relevamiento).map(encuesta => (
+                                <Card
+                                    key={encuesta.id}
+                                    onClick={() => verDetalleEncuesta(encuesta.id)}
+                                    className="!bg-brand-blue !border-brand-blue cursor-pointer group !text-white"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="text-xl font-bold">📍 {encuesta.nombre}</h3>
+                                        <FileText size={20} className="opacity-70 group-hover:opacity-100" />
+                                    </div>
+                                    <p className="mt-2 opacity-90 text-sm">{encuesta.descripcion || "Relevamiento Principal"}</p>
+                                    <div className="mt-4 text-xs bg-white/20 inline-block px-3 py-1 rounded-full backdrop-blur-sm">
+                                        {encuesta.fecha_creacion ? new Date(encuesta.fecha_creacion).toLocaleDateString() : 'Sin Fecha'}
+                                    </div>
+                                </Card>
+                            ))}
+                            {/* Encuestas Normales */}
+                            {encuestas.filter(e => !e.es_relevamiento).sort((a, b) => b.id - a.id).map(encuesta => (
+                                <Card
+                                    key={encuesta.id}
+                                    onClick={() => verDetalleEncuesta(encuesta.id)}
+                                    className="cursor-pointer group hover:border-brand-blue/50"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="text-lg font-bold text-content-primary group-hover:text-brand-blue">{encuesta.nombre}</h3>
+                                        <FileText size={20} className="text-content-secondary group-hover:text-brand-blue/70" />
+                                    </div>
+                                    <p className="text-sm text-content-secondary mt-2 line-clamp-2 min-h-[2.5rem]">
+                                        {encuesta.descripcion || "Sin descripción"}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-4 text-xs text-content-secondary/70">
+                                        <Calendar size={12} />
+                                        {encuesta.fecha_creacion ? new Date(encuesta.fecha_creacion).toLocaleDateString() : 'Sin Fecha'}
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
                 </div>
             ) : (
                 /* VISTA DETALLE */
@@ -200,7 +257,7 @@ export default function RespuestasDashboard() {
                                     onClick={handleExportZip}
                                     disabled={downloading}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-opacity
-                                        ${downloading
+                                            ${downloading
                                             ? 'bg-surface-secondary text-content-secondary cursor-not-allowed border border-border-base'
                                             : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
                                 >
@@ -277,38 +334,6 @@ export default function RespuestasDashboard() {
                                                                         </button>
                                                                     </td>
                                                                 </tr>
-
-                                                                {isExpanded && (
-                                                                    <tr className="bg-surface-secondary/30">
-                                                                        <td colSpan="4" className="p-4 pl-6">
-                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                                                                                {validDetails.map((d, idx) => {
-                                                                                    const pregTitulo = preguntas.find(p => p.id === d.pregunta)?.titulo || `Pregunta ${d.pregunta}`;
-                                                                                    let valorDisplay = d.valor_texto || d.valor_numero;
-
-                                                                                    return (
-                                                                                        <div key={idx} className="bg-surface-primary p-3 rounded border border-border-base">
-                                                                                            <div className="text-xs font-bold text-brand-blue uppercase mb-1">{pregTitulo}</div>
-                                                                                            {d.valor_foto ? (
-                                                                                                <div className="mt-2">
-                                                                                                    <img
-                                                                                                        src={getSecureUrl(d.valor_foto)}
-                                                                                                        alt="Respuesta"
-                                                                                                        className="h-32 w-auto object-cover rounded-md border border-border-base"
-                                                                                                    />
-                                                                                                    <a href={getSecureUrl(d.valor_foto)} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mt-1 block">Ver original</a>
-                                                                                                </div>
-                                                                                            ) : (
-                                                                                                <div className="text-content-primary break-words">{valorDisplay}</div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                                {validDetails.length === 0 && <div className="text-content-secondary italic p-2">Esta respuesta no contiene datos visibles.</div>}
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                )}
                                                             </React.Fragment>
                                                         );
                                                     })}
@@ -328,28 +353,9 @@ export default function RespuestasDashboard() {
                                                 </button>
 
                                                 <div className="flex items-center gap-1">
-                                                    {/* Indicador simple de páginas */}
-                                                    {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
-                                                        // Lógica simple para mostrar 1, 2, 3... o alrededor de la actual
-                                                        let pageNum = i + 1;
-                                                        if (totalPaginas > 5 && paginaActual > 3) {
-                                                            pageNum = paginaActual - 2 + i;
-                                                        }
-                                                        if (pageNum > totalPaginas) return null;
-
-                                                        return (
-                                                            <button
-                                                                key={pageNum}
-                                                                onClick={() => setPaginaActual(pageNum)}
-                                                                className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors
-                                                                    ${paginaActual === pageNum
-                                                                        ? 'bg-brand-blue text-white'
-                                                                        : 'text-content-secondary hover:bg-surface-secondary'}`}
-                                                            >
-                                                                {pageNum}
-                                                            </button>
-                                                        );
-                                                    })}
+                                                    <span className="text-sm text-content-secondary">
+                                                        Página {paginaActual} de {totalPaginas}
+                                                    </span>
                                                 </div>
 
                                                 <button
@@ -386,6 +392,7 @@ export default function RespuestasDashboard() {
                     )}
                 </div>
             )}
+
             {/* MODAL DE DETALLE DE RESPUESTA */}
             {selectedResponse && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -395,42 +402,67 @@ export default function RespuestasDashboard() {
                             <div>
                                 <h3 className="text-xl font-bold text-content-primary flex items-center gap-2">
                                     <FileText className="text-brand-blue" />
-                                    Detalle de Respuesta #{selectedResponse.id}
+                                    {isEditing ? `Editando Respuesta #${selectedResponse.id}` : `Detalle de Respuesta #${selectedResponse.id}`}
                                 </h3>
                                 <div className="flex items-center gap-4 mt-1 text-sm text-content-secondary">
                                     <span className="flex items-center gap-1"><User size={14} /> {selectedResponse.usuario_nombre || "Anónimo"}</span>
                                     <span className="flex items-center gap-1"><Calendar size={14} /> {selectedResponse.fecha_envio}</span>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setSelectedResponse(null)}
-                                className="p-2 hover:bg-surface-secondary rounded-full text-content-secondary transition-colors"
-                            >
-                                <X size={24} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {!isEditing && (
+                                    <button
+                                        onClick={handleEditClick}
+                                        className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-full transition-colors"
+                                        title="Editar Respuesta"
+                                    >
+                                        <Edit2 size={20} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => { setSelectedResponse(null); setIsEditing(false); }}
+                                    className="p-2 hover:bg-surface-secondary rounded-full text-content-secondary transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Contenido del Modal */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                            {/* Información de Ubicación si aplica */}
-                            {(selectedResponse.seccion || selectedResponse.barrio) && (
-                                <div className="bg-brand-blue/5 border border-brand-blue/10 p-4 rounded-xl flex flex-wrap gap-6">
-                                    {selectedResponse.seccion && (
-                                        <div>
-                                            <div className="text-[10px] uppercase font-bold text-brand-blue/60 mb-0.5">Sección</div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-surface-secondary/10">
+                            {/* Información de Ubicación */}
+                            {(isEditing || selectedResponse.seccion || selectedResponse.barrio) && (
+                                <div className="bg-white border border-border-base p-5 rounded-xl flex flex-wrap gap-6 shadow-sm">
+                                    <div className="flex-1 min-w-[200px]">
+                                        <div className="text-[10px] uppercase font-bold text-content-secondary mb-1">Sección</div>
+                                        {isEditing ? (
+                                            <input
+                                                type="text"
+                                                className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none"
+                                                value={editForm.seccion}
+                                                onChange={e => setEditForm({ ...editForm, seccion: e.target.value })}
+                                            />
+                                        ) : (
                                             <div className="text-sm font-semibold text-content-primary flex items-center gap-1.5">
-                                                <MapPin size={14} className="text-brand-blue" /> {selectedResponse.seccion}
+                                                <MapPin size={14} className="text-brand-blue" /> {selectedResponse.seccion || "-"}
                                             </div>
-                                        </div>
-                                    )}
-                                    {selectedResponse.barrio && (
-                                        <div>
-                                            <div className="text-[10px] uppercase font-bold text-brand-blue/60 mb-0.5">Barrio</div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-[200px]">
+                                        <div className="text-[10px] uppercase font-bold text-content-secondary mb-1">Barrio</div>
+                                        {isEditing ? (
+                                            <input
+                                                type="text"
+                                                className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none"
+                                                value={editForm.barrio}
+                                                onChange={e => setEditForm({ ...editForm, barrio: e.target.value })}
+                                            />
+                                        ) : (
                                             <div className="text-sm font-semibold text-content-primary flex items-center gap-1.5">
-                                                <MapPin size={14} className="text-brand-blue" /> {selectedResponse.barrio}
+                                                <MapPin size={14} className="text-brand-blue" /> {selectedResponse.barrio || "-"}
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -439,44 +471,83 @@ export default function RespuestasDashboard() {
                                 {selectedResponse.detalles.map((d, idx) => {
                                     const preg = preguntas.find(p => p.id === d.pregunta);
                                     const pregTitulo = preg?.titulo || `Pregunta ${d.pregunta}`;
-                                    const hasPhotos = (d.fotos_extra && d.fotos_extra.length > 0) || d.valor_foto;
+                                    // Preparar imagenes
+                                    let images = [];
+                                    if (d.fotos_extra && d.fotos_extra.length > 0) {
+                                        images = d.fotos_extra.map(f => ({ id: f.id, url: f.imagen, isLegacy: false }));
+                                    } else if (d.valor_foto) {
+                                        images = [{ id: d.id, url: d.valor_foto, isLegacy: true }];
+                                    }
+
+                                    // Filtrar borradas en modo edición
+                                    if (isEditing) {
+                                        images = images.filter(img => !photosToDelete.includes(img.id));
+                                    }
+
+                                    const hasPhotos = images.length > 0;
 
                                     return (
-                                        <div key={idx} className={`p-4 rounded-xl border border-border-base bg-surface-primary shadow-sm hover:shadow-md transition-shadow ${hasPhotos ? 'md:col-span-2' : ''}`}>
+                                        <div key={idx} className={`p-4 rounded-xl border border-border-base bg-white shadow-sm hover:shadow-md transition-shadow ${hasPhotos ? 'md:col-span-2' : ''}`}>
                                             <div className="text-xs font-bold text-brand-blue uppercase mb-2 tracking-wider">{pregTitulo}</div>
 
                                             {hasPhotos ? (
-                                                <div className="space-y-4">
-                                                    <div className={`grid gap-4 ${d.fotos_extra?.length > 1 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                                                        {d.fotos_extra && d.fotos_extra.length > 0 ? (
-                                                            d.fotos_extra.map((foto, fIdx) => (
-                                                                <div key={fIdx} className="space-y-2">
-                                                                    <img
-                                                                        src={getSecureUrl(foto.imagen)}
-                                                                        alt={`Foto ${fIdx + 1}`}
-                                                                        className="w-full h-64 object-cover rounded-lg border border-border-base shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-                                                                        onClick={() => window.open(getSecureUrl(foto.imagen), '_blank')}
-                                                                    />
+                                                <div className="mt-2">
+                                                    {isEditing ? (
+                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                            {images.map(img => (
+                                                                <div key={img.id} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-border-base">
+                                                                    <img src={getSecureUrl(img.url)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            if (!img.isLegacy) {
+                                                                                setPhotosToDelete([...photosToDelete, img.id]);
+                                                                            } else {
+                                                                                alert("No se puede borrar esta foto antigua en modo edición rápida. Contacte a soporte.");
+                                                                            }
+                                                                        }}
+                                                                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm"
+                                                                        title="Borrar foto"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </button>
                                                                 </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="space-y-2">
-                                                                <img
-                                                                    src={getSecureUrl(d.valor_foto)}
-                                                                    alt="Respuesta"
-                                                                    className="w-full h-64 object-cover rounded-lg border border-border-base shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-                                                                    onClick={() => window.open(getSecureUrl(d.valor_foto), '_blank')}
-                                                                />
+                                                            ))}
+                                                            <div className="flex items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary text-xs text-center p-2">
+                                                                (Subida bloqueada en edición)
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-content-secondary italic text-right">
-                                                        Toca una imagen para verla en tamaño completo
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <ImageCarousel images={images} />
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="text-content-primary font-medium text-base whitespace-pre-wrap">
-                                                    {d.valor_texto || d.valor_numero || <span className="text-content-secondary italic text-sm">Sin respuesta</span>}
+                                                    {isEditing ? (
+                                                        preg?.tipo === 'numero' ? (
+                                                            <input
+                                                                type="number"
+                                                                className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none"
+                                                                value={editForm.respuestas[d.pregunta] || ""}
+                                                                onChange={e => setEditForm({
+                                                                    ...editForm,
+                                                                    respuestas: { ...editForm.respuestas, [d.pregunta]: e.target.value }
+                                                                })}
+                                                            />
+                                                        ) : (
+                                                            <textarea
+                                                                className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none min-h-[80px]"
+                                                                value={editForm.respuestas[d.pregunta] || ""}
+                                                                onChange={e => setEditForm({
+                                                                    ...editForm,
+                                                                    respuestas: { ...editForm.respuestas, [d.pregunta]: e.target.value }
+                                                                })}
+                                                            />
+                                                        )
+                                                    ) : (
+                                                        (d.valor_texto || d.valor_numero)
+                                                            ? <CompactText text={d.valor_texto || d.valor_numero} />
+                                                            : <span className="text-content-secondary italic text-sm">Sin respuesta</span>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -486,13 +557,32 @@ export default function RespuestasDashboard() {
                         </div>
 
                         {/* Footer del Modal */}
-                        <div className="p-4 border-t border-border-base bg-surface-secondary/30 flex justify-end">
-                            <button
-                                onClick={() => setSelectedResponse(null)}
-                                className="px-6 py-2 bg-brand-blue text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-brand-blue/20"
-                            >
-                                Cerrar Detalle
-                            </button>
+                        <div className="p-4 border-t border-border-base bg-surface-secondary/30 flex justify-end gap-3">
+                            {isEditing ? (
+                                <>
+                                    <button
+                                        onClick={() => setIsEditing(false)}
+                                        className="px-4 py-2 text-content-secondary hover:bg-surface-secondary rounded-lg transition-colors font-medium border border-transparent hover:border-border-base"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleSaveResponse}
+                                        disabled={saving}
+                                        className="px-6 py-2 bg-brand-blue text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-brand-blue/20 flex items-center gap-2"
+                                    >
+                                        {saving ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
+                                        Guardar Cambios
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setSelectedResponse(null)}
+                                    className="px-6 py-2 bg-surface-secondary border border-border-base text-content-primary rounded-lg font-medium hover:bg-surface-tertiary transition-colors"
+                                >
+                                    Cerrar Detalle
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

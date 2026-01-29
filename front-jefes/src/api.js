@@ -158,11 +158,38 @@ export const deleteContacto = async (id) => {
     return handleResponse(response);
 };
 
-export const importContactos = async (contactos, tag) => {
+export const importContactos = async (archivo, tag) => {
+    const formData = new FormData();
+    formData.append('file', archivo);
+    formData.append('tag', tag);
+
+    // No enviamos Content-Type header manualmente con FormData, el navegador lo pone con el boundary
+    const token = localStorage.getItem('access_token');
     const response = await fetch(`${API_URL}/api/surveys/contactos/importar/`, {
         method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ contactos, tag })
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        body: formData
+    });
+    return handleResponse(response);
+};
+
+export const updateResponse = async (id, payload) => {
+    // Si viene FormData (para imagenes), no stringify. Si es JSON object, stringify.
+    const isFormData = payload instanceof FormData;
+    const body = isFormData ? payload : JSON.stringify(payload);
+
+    const headers = getHeaders();
+    if (isFormData) {
+        // Fetch pone el boundary automáticamente si quitamos Content-Type
+        delete headers['Content-Type'];
+    }
+
+    const response = await fetch(`${API_URL}/api/surveys/responses/${id}/`, {
+        method: 'PATCH',
+        headers: headers,
+        body: body
     });
     return handleResponse(response);
 };

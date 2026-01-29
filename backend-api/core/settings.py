@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     # Local
     'users',
     'surveys',
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 MIDDLEWARE = [
