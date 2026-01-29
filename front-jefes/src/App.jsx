@@ -8,22 +8,6 @@ import ContactViewerPage from './pages/ContactViewerPage';
 import RespuestasDashboard from './pages/RespuestasDashboard';
 import DashboardLayout from './layouts/DashboardLayout';
 
-// 1. Escucha el token que viene de la redireccion
-const TokenListener = () => {
-    useEffect(() => {
-        const queryParams = new URLSearchParams(window.location.search);
-        const tokenRecibido = queryParams.get("token");
-
-        if (tokenRecibido) {
-            localStorage.setItem("access_token", tokenRecibido);
-            const cleanUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
-            window.location.reload();
-        }
-    }, []);
-    return null;
-};
-
 // 2. Protege la ruta: Si no hay token, fuera.
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem('access_token');
@@ -38,9 +22,30 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+    // --- LÓGICA DE TOKEN (Solicitada por el usuario) ---
+    useEffect(() => {
+        // 1. Buscamos si hay un token en la URL (?token=...)
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+
+        if (token) {
+            // 2. Si existe, lo guardamos para que el resto del front pueda usarlo
+            localStorage.setItem('access_token', token);
+
+            // 3. Limpiamos la URL (quitamos el ?token=...) para que no quede expuesto
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // Recargamos para limpiar limpio el estado o asegurar auth
+            // (El usuario no lo puso en su snippet, pero en la version anterior estaba. 
+            //  Seguiré su snippet ESTRICTAMENTE como pidió: "Sigue estos paso no inventes nada")
+            //  El snippet del usuario NO tiene reload, solo log.
+            console.log("Token capturado y guardado correctamente.");
+        }
+    }, []);
+    // ----------------------------------------------------
+
     return (
         <BrowserRouter>
-            <TokenListener />
             <Routes>
                 {/* Rutas con Sidebar (DashboardLayout) */}
                 <Route element={

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import MyButton from "../components/ui/MyButton";
+import MyButton from "./ui/MyButton";
 import { login } from "../api";
 
 const LoginSection = () => {
@@ -8,7 +8,6 @@ const LoginSection = () => {
     const [password, setPassword] = useState("");
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [loading, setLoading] = useState(false);
-
     const [error, setError] = useState(null);
 
     const handleSubmit = async (event) => {
@@ -19,48 +18,33 @@ const LoginSection = () => {
         try {
             const data = await login(email, password);
 
-            // 1. Guardar tokens y datos básicos
             localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-            localStorage.setItem('role', data.role);
-            localStorage.setItem('user_name', data.name);
 
-            // Guardamos los accesos (la lista de sectores permitidos)
-            // Si el backend aún no lo manda, usamos un array vacío para no romper nada
-            const accesos = data.accesos || [];
-            localStorage.setItem('accesos', JSON.stringify(accesos));
-
-            // 2. Preparar la URL base (Detecta si es Local o Producción)
             const isLocal = window.location.hostname.includes('localhost');
-            // En local asumimos puerto 5173 para Vite, en prod nada.
-            const DOMINIO_BASE = isLocal ? 'localhost:5173' : 'ushuaiamovimiento.com.ar';
             const PROTOCOLO = window.location.protocol;
+            const PUERTO_JEFES = isLocal ? ':3100' : '';
+            const PUERTO_EMPLEADOS = isLocal ? ':3010' : '';
+            const DOMINIO_RAIZ = isLocal ? 'localhost' : 'ushuaiamovimiento.com.ar';
 
-            // 3. Lógica de Redirección (El semáforo)
+            const accesos = data.accesos || [];
 
-            // CASO A: Es Jefe (o tiene permiso de jefe) -> Va a Administración
             if (data.role === 'jefe' || accesos.includes('jefe')) {
-                // NOTA: Cambiamos 'jefes' por 'administracion' como pediste
-                window.location.href = `${PROTOCOLO}//administracion.${DOMINIO_BASE}?token=${data.access}`;
+                const subdominio = isLocal ? '' : 'administracion.';
+                window.location.href = `${PROTOCOLO}//${subdominio}${DOMINIO_RAIZ}${PUERTO_JEFES}?token=${data.access}`;
 
-                // CASO B: Es Empleado del sector Barrios -> Va a Barrios
-            } else if (accesos.includes('barrios')) {
-                window.location.href = `${PROTOCOLO}//barrios.${DOMINIO_BASE}?token=${data.access}`;
-
-                // CASO C: Tiene otros sectores (Genérico)
             } else if (accesos.length > 0) {
-                // Si tiene otro sector (ej: logistica), lo mandamos al primero que tenga
-                window.location.href = `${PROTOCOLO}//${accesos[0]}.${DOMINIO_BASE}?token=${data.access}`;
+                const sector = accesos[0];
+                const subdominio = isLocal ? '' : `${sector}.`;
 
-                // CASO D: Login correcto pero sin sector asignado
+                window.location.href = `${PROTOCOLO}//${subdominio}${DOMINIO_RAIZ}${PUERTO_EMPLEADOS}?token=${data.access}`;
+
             } else {
-                // Fallback por si acaso: si es empleado sin grupo, lo dejamos en el dashboard general
-                window.location.href = "/";
+                setError("Usuario sin sector asignado.");
             }
 
         } catch (err) {
             console.error(err);
-            setError("Credenciales inválidas o error en el servidor");
+            setError("Error de acceso. Verifique sus datos.");
         } finally {
             setLoading(false);
         }

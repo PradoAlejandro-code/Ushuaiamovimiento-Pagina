@@ -33,11 +33,12 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
 CORS_ALLOW_ALL_ORIGINS = True # Development only
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5173",
-    "https://api.ushuaiamovimiento.com.ar",
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    # Esto permite CUALQUIER subdominio en tu web (jefes, administracion, barrios, lo que inventes mañana)
+    r"^https://\w+\.ushuaiamovimiento\.com\.ar$",
+    
+    # Para tus pruebas locales
+    r"^http://localhost:\d+$",
 ]
 
 

@@ -9,22 +9,25 @@ const getHeaders = () => {
 };
 
 const handleResponse = async (response) => {
-    if (response.status === 401) {
-        // Token vencido o invalido
+    if (response.status === 401 || response.status === 403) {
+        // Limpiamos todo rastro del usuario
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('role');
         localStorage.removeItem('user_name');
+        localStorage.removeItem('accesos');
         window.location.href = '/login';
-        throw new Error('Sesión expirada');
+
+        throw new Error('Acceso denegado o sesión expirada');
     }
+
     if (!response.ok) {
         let errorMessage = 'Error en la petición';
         try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorData.details || JSON.stringify(errorData) || errorMessage;
         } catch (e) {
-            // No es un JSON o no se pudo leer
+
         }
         throw new Error(errorMessage);
     }

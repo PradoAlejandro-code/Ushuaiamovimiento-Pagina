@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import LoginPage from "./pages/LoginPage";
 import SurveyViewer from "./pages/SurveyViewer";
 import Home from "./pages/Home";
@@ -14,6 +15,18 @@ const ProtectedRoute = ({ children }) => {
 
 // 3. Configuración de Rutas
 function App() {
+  // Lógica para capturar el token que viene del Login Externo
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (token) {
+      localStorage.setItem('access_token', token);
+      // Limpiamos la URL para que no se vea el token feo ahí
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
