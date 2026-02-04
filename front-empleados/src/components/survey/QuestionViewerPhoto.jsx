@@ -1,22 +1,34 @@
-import { useState, useEffect } from 'react';
-import { Camera, X, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, X, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
-const QuestionViewerPhoto = ({ question, onChange, value }) => {
+const QuestionViewerPhoto = ({ question, onChange, value, onProcessingStatus }) => {
     const [previews, setPreviews] = useState([]);
-    const [compressingCount, setCompressingCount] = useState(0);
+    const [processingCount, setProcessingCount] = useState(0);
+    const abortControllerRef = useRef(null);
 
-    // Sincronizar previsualizaciones con el estado global de respuestas
+    // Notificar al padre sobre el estado de procesamiento
+    useEffect(() => {
+        if (onProcessingStatus) {
+            onProcessingStatus(question.id, processingCount > 0);
+        }
+    }, [processingCount, question.id, onProcessingStatus]);
+
+    // 1. Sincronización de Previsualizaciones
     useEffect(() => {
         if (value && Array.isArray(value)) {
-            const newPreviews = value
-                .filter(f => f instanceof File)
-                .map(file => URL.createObjectURL(file));
+            const newPreviews = value.map(file => {
+                if (typeof file === 'string') return file;
+                if (file instanceof Blob) return URL.createObjectURL(file);
+                return null;
+            }).filter(Boolean);
 
             setPreviews(newPreviews);
 
             return () => {
-                newPreviews.forEach(url => URL.revokeObjectURL(url));
+                newPreviews.forEach(url => {
+                    if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
+                });
             };
         } else {
             setPreviews([]);
@@ -27,49 +39,42 @@ const QuestionViewerPhoto = ({ question, onChange, value }) => {
         if (e.target.files && e.target.files.length > 0) {
             const selectedFiles = Array.from(e.target.files);
 
-            // Establecemos cuántos archivos se están procesando para mostrar los loaders
-            setCompressingCount(selectedFiles.length);
+            // 2. Iniciamos el contador de carga con el total
+            setProcessingCount(selectedFiles.length);
 
             const options = {
-                maxSizeMB: 0.8, // 800KB max size
+                maxSizeMB: 0.8,
                 maxWidthOrHeight: 1280,
                 useWebWorker: true
             };
 
             try {
-                // Comprimir todas las imágenes seleccionadas
-                const compressedFiles = await Promise.all(
-                    selectedFiles.map(async (file) => {
-                        // Solo intentamos comprimir si es imagen
-                        if (file.type.startsWith('image/')) {
-                            try {
-                                console.log(`Comprimiendo ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-                                const compressedFile = await imageCompression(file, options);
-                                console.log(`Resultado ${file.name}: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
-                                return compressedFile;
-                            } catch (error) {
-                                console.error("Error al comprimir imagen:", error);
-                                // Si falla, devolvemos el original para no bloquear al usuario
-                                return file;
-                            }
+                let currentFiles = Array.isArray(value) ? [...value] : [];
+
+                // 3. PROCESO SECUENCIAL: Actualizamos tras CADA foto
+                for (const file of selectedFiles) {
+                    let fileToSave = file;
+
+                    if (file.type.startsWith('image/')) {
+                        try {
+                            fileToSave = await imageCompression(file, options);
+                        } catch (err) {
+                            console.error("Error comprimiendo:", err);
                         }
-                        return file;
-                    })
-                );
+                    }
 
-                // LÓGICA ACUMULATIVA: 
-                // Si ya hay archivos previos (value), los combinamos con los nuevos seleccionados
-                const previousFiles = Array.isArray(value) ? value : [];
-                const combinedFiles = [...previousFiles, ...compressedFiles];
+                    currentFiles = [...currentFiles, fileToSave];
 
-                // Notificar al padre con la lista completa aumentada
-                onChange(combinedFiles);
+                    // Notificamos al padre INMEDIATAMENTE
+                    onChange(currentFiles);
+
+                    // Bajamos el contador para que desaparezca un "Cargando" y aparezca la foto
+                    setProcessingCount(prev => Math.max(0, prev - 1));
+                }
             } catch (error) {
-                console.error("Error procesando archivos:", error);
+                console.error("Error general:", error);
+                setProcessingCount(0);
             } finally {
-                // Terminó el proceso (éxito o error), quitamos los loaders
-                setCompressingCount(0);
-                // Limpiamos el input para permitir subir el mismo archivo si se desea (aunque es raro en uso normal)
                 e.target.value = '';
             }
         }
@@ -78,94 +83,71 @@ const QuestionViewerPhoto = ({ question, onChange, value }) => {
     const removeFile = (indexToRemove, e) => {
         e.preventDefault();
         e.stopPropagation();
-
-        // Filtrar la lista de archivos para quitar solo el que el usuario eligió
         const updatedFiles = value.filter((_, idx) => idx !== indexToRemove);
-
-        // Si no quedan archivos, mandamos null, si no, la lista actualizada
         onChange(updatedFiles.length > 0 ? updatedFiles : null);
     };
 
-    const clearAll = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onChange(null);
-    };
-
     return (
-        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 hover:shadow-md transition-all border-l-4 border-l-pink-500 dark:border-l-pink-400">
+        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 border-l-4 border-l-brand-blue dark:border-l-brand-orange transition-all duration-300">
             <div className="space-y-4">
                 <div className="flex justify-between items-start">
                     <div>
-                        <label className="block text-xs font-semibold text-pink-600 dark:text-pink-400 uppercase tracking-wide mb-1">
+                        <label className="block text-xs font-bold text-brand-blue dark:text-brand-orange uppercase tracking-wide mb-1 transition-colors">
                             {question.obligatoria ? "Foto Requerida *" : "Fotos Opcionales"}
                         </label>
-                        <h3 className="text-lg font-medium text-content-primary">
+                        <h3 className="text-lg font-medium text-content-primary transition-colors">
                             {question.titulo}
                         </h3>
-                        <div className="flex items-center gap-1 mt-1">
-                            <ImageIcon size={12} className="text-content-secondary" />
-                            <p className="text-xs text-content-secondary">Toca para agregar más fotos.</p>
-                        </div>
                     </div>
-                    {previews.length > 0 && !compressingCount && (
-                        <button onClick={clearAll} className="text-xs text-red-500 font-bold hover:underline">
+                    {previews.length > 0 && processingCount === 0 && (
+                        <button onClick={() => onChange(null)} className="text-xs text-red-500 font-bold hover:underline">
                             Borrar todas
                         </button>
                     )}
                 </div>
 
                 <div className="relative">
-                    <div className={`border-2 border-dashed border-border-base rounded-lg p-4 flex flex-col items-center justify-center transition-colors min-h-[120px] ${compressingCount > 0 ? 'bg-gray-100 cursor-wait' : 'bg-surface-secondary/30 hover:bg-surface-secondary/50 cursor-pointer'}`}>
+                    <div className={`border-2 border-dashed border-border-base rounded-lg p-4 min-h-[140px] flex items-center justify-center transition-all ${processingCount > 0 ? 'bg-surface-secondary/60' : 'bg-surface-secondary/20'}`}>
 
-                        {(previews.length > 0 || compressingCount > 0) ? (
+                        {(previews.length > 0 || processingCount > 0) ? (
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 w-full">
                                 {previews.map((src, idx) => (
-                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border-base group/item">
+                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border-base group">
                                         <img src={src} alt="preview" className="w-full h-full object-cover" />
-                                        {/* Botón individual para borrar una foto específica */}
                                         <button
-                                            onClick={(e) => removeFile(idx, e)}
-                                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover/item:opacity-100 transition-opacity z-20"
-                                            disabled={compressingCount > 0}
+                                            onClick={() => removeFile(idx)}
+                                            className="absolute top-1 right-1 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm transition-all z-10"
                                         >
-                                            <X size={12} />
+                                            <X size={18} />
                                         </button>
                                     </div>
                                 ))}
 
-                                {/* Renderizamos los placeholders de carga si hay archivos comprimiéndose */}
-                                {compressingCount > 0 && Array.from({ length: compressingCount }).map((_, idx) => (
-                                    <div key={`loading-${idx}`} className="relative aspect-square rounded-lg overflow-hidden border border-border-base bg-surface-secondary flex items-center justify-center animate-pulse">
-                                        <Loader2 className="animate-spin text-pink-500" size={24} />
+                                {/* Cuadros de carga individuales según el remanente */}
+                                {processingCount > 0 && Array.from({ length: processingCount }).map((_, i) => (
+                                    <div key={`loading-${i}`} className="aspect-square rounded-lg border border-dashed border-brand-blue/30 dark:border-brand-orange/30 bg-brand-blue/5 dark:bg-brand-orange/10 flex flex-col items-center justify-center animate-pulse">
+                                        <Loader2 className="animate-spin text-brand-blue dark:text-brand-orange mb-1" size={24} />
+                                        <span className="text-[10px] text-brand-blue dark:text-brand-orange font-black uppercase text-center px-1">Cargando</span>
                                     </div>
                                 ))}
 
-                                {/* Botón "Añadir más" solo si NO estamos comprimiendo */}
-                                {!compressingCount && (
-                                    <div className="relative aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary hover:text-pink-500 transition-colors">
-                                        <Camera size={20} />
+                                {processingCount === 0 && (
+                                    <div className="relative aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary hover:text-brand-blue dark:hover:text-brand-orange hover:border-brand-blue dark:hover:border-brand-orange transition-all cursor-pointer group">
+                                        <Camera size={20} className="group-hover:scale-110 transition-transform text-brand-blue dark:text-brand-orange" />
                                         <span className="text-[10px] font-bold mt-1">Añadir</span>
+                                        <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            <>
-                                <div className="bg-pink-50 dark:bg-pink-900/20 p-3 rounded-full mb-2">
-                                    <Camera size={24} className="text-pink-500 dark:text-pink-400" />
+                            <div className="flex flex-col items-center py-4 cursor-pointer relative w-full group">
+                                <div className="bg-brand-blue/10 dark:bg-brand-orange/10 p-3 rounded-full mb-2 group-hover:scale-110 transition-transform">
+                                    <Camera size={24} className="text-brand-blue dark:text-brand-orange" />
                                 </div>
-                                <span className="text-sm font-medium text-content-secondary text-center">Toca para subir o tomar fotos</span>
-                            </>
+                                <span className="text-sm font-medium text-content-secondary group-hover:text-brand-blue dark:group-hover:text-brand-orange transition-colors">Toca para subir o tomar fotos</span>
+                                <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
+                            </div>
                         )}
-
-                        <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10 disabled:cursor-wait disabled:pointer-events-none"
-                            onChange={handleFileChange}
-                            disabled={compressingCount > 0}
-                        />
                     </div>
                 </div>
             </div>
@@ -173,4 +155,4 @@ const QuestionViewerPhoto = ({ question, onChange, value }) => {
     );
 };
 
-export default QuestionViewerPhoto;
+export default QuestionViewerPhoto; 2

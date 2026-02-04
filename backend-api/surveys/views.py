@@ -144,28 +144,10 @@ class RespuestaCreateView(APIView):
                         except ValueError:
                             pass
                     
-                    from django.core.files.base import ContentFile
-
                     # Check for Photo
                     valor_foto = None
-                    if is_multipart:
-                        file_key = f"foto_{pregunta_id}"
-                        # Usar el primero para el campo legacy (pero CLONADO para no romper el archivo en disco)
-                        if file_key in request.FILES:
-                            files_list = request.FILES.getlist(file_key)
-                            if files_list:
-                                first_f = files_list[0]
-                                try:
-                                    # Leemos en memoria para crear una copia independiente
-                                    # Esto evita que al guardar el 'detalle', Django mueva/borre el archivo temporal
-                                    first_f.seek(0)
-                                    content_copy = first_f.read()
-                                    first_f.seek(0) # Rebobinamos para el siguiente uso
-                                    valor_foto = ContentFile(content_copy, name=first_f.name)
-                                except Exception as e:
-                                    print(f"Error cloning file: {e}")
-                                    # Fallback: usaremos el original (riesgoso si se mueve, pero mejor que nada)
-                                    valor_foto = first_f
+                    # [LEGACY FIX] No guardamos más en valor_foto para evitar duplicados.
+                    # Se guardan solo en RespuestaFoto (abajo).
                                 
                     detalle = RespuestaDetalle.objects.create(
                         header=header,
@@ -408,7 +390,7 @@ class SurveyResponseListView(generics.ListAPIView):
 
     def get_queryset(self):
         encuesta_id = self.kwargs['encuesta_id']
-        return RespuestaHeader.objects.filter(encuesta_id=encuesta_id).prefetch_related('detalles')
+        return RespuestaHeader.objects.filter(encuesta_id=encuesta_id).prefetch_related('detalles').order_by('-fecha_envio')
 
 class ExportarEncuestaCompletaView(APIView):
     permission_classes = [IsAuthenticated]
@@ -569,36 +551,81 @@ class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RespuestaUpdateSerializer
     permission_classes = [IsAuthenticated]
 
+    def update(self, request, *args, **kwargs):
+        import json
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Intercept multipart to parse JSON 'data' field logic (consistent with CreateView)
+        content_type = request.content_type or ""
+        if 'multipart/form-data' in content_type:
+             raw_json = request.data.get('data') or request.POST.get('data')
+             if raw_json:
+                 try:
+                     parsed_data = json.loads(raw_json)
+                     # Merge parsed data with request data (files remain in request.FILES)
+                     # We can instantiate serializer with parsed_data
+                     serializer = self.get_serializer(instance, data=parsed_data, partial=partial)
+                     
+                     if serializer.is_valid():
+                         self.perform_update(serializer)
+                         
+                         if getattr(instance, '_prefetched_objects_cache', None):
+                             # If 'prefetch_related' has been applied to a queryset, we need to
+                             # forcibly invalidate the prefetch cache on the instance.
+                             instance._prefetched_objects_cache = {}
+                             
+                         return Response(serializer.data)
+                     else:
+                        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+                 except Exception as e:
+                     return Response({"error": f"JSON inválido en 'data': {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Standard behavior
+        return super().update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         # 1. Guardar cambios básicos (texto/numero/seccion/barrio)
         header = serializer.save()
         
         # 2. Manejar imágenes si es multipart (AGREGAR)
+        # Note: self.request is available here
         content_type = self.request.content_type or ""
         if 'multipart/form-data' in content_type:
-            # Iterar sobre las preguntas del header para buscar archivos
-            for detalle in header.detalles.all():
-                file_key = f"foto_{detalle.pregunta_id}"
-                if file_key in self.request.FILES:
-                    files = self.request.FILES.getlist(file_key)
-                    if files:
-                        # Si es reemplazo completo o append depende de la logica. 
-                        # Asumimos append para ser seguros, o reemplazo si el cliente asi lo indica?
-                        # Por ahora mantenemos logica de agregar.
-                        
-                        # Si quisiéramos borrar las viejas al subir nuevas, descomentar esto:
-                        # detalle.fotos_extra.all().delete()
-                        # detalle.valor_foto = None
-                        
-                        # Guardar todas en la tabla relacionada
-                        for f in files:
-                            RespuestaFoto.objects.create(detalle=detalle, imagen=f)
+            # Iteramos sobre los archivos recibidos para ver a qué pregunta corresponden
+            for key, files in self.request.FILES.lists():
+                # Esperamos claves tipo "foto_123" donde 123 es el id de la pregunta
+                if key.startswith('foto_'):
+                    try:
+                        pregunta_id = int(key.split('_')[1])
+                    except (IndexError, ValueError):
+                        continue
+                    
+                    if not files: continue
+                    
+                    # Buscamos o creamos el detalle para esta pregunta
+                    # (Si la pregunta estaba vacía, no tiene detalle aún)
+                    detalle, created = RespuestaDetalle.objects.get_or_create(
+                        header=header,
+                        pregunta_id=pregunta_id,
+                        defaults={'encuesta_id': header.encuesta_id}
+                    )
+                    
+                    # Guardar las fotos
+                    for f in files:
+                        RespuestaFoto.objects.create(detalle=detalle, imagen=f)
 
         # 3. ELIMINAR FOTOS (Lógica solicitada)
-        # Esperamos 'delete_extra_ids': lista de IDs de RespuestaFoto a borrar
-        # Esperamos 'delete_legacy_detail_ids': lista de IDs de RespuestaDetalle a limpiar valor_foto
+        # Check both parsed data (if we injected it?) No, request.data might be raw or parsed depending on above.
+        # But if we used the 'data' trick above, 'delete_extra_ids' is in the parsed dict, NOT in request.data directly necessarily if DRF didn't parse it.
         
-        data = self.request.data
+        # To be safe, look in the serializer.initial_data if available, or try to get from request again.
+        # If we passed `data` to serializer, it's there.
+        
+        data = serializer.initial_data # This should hold the dict we passed
+        
+        # Helper para parsear listas
         
         # Helper para parsear listas (por si vienen en FormData json string o list)
         def parse_ids(key):

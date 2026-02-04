@@ -14,7 +14,19 @@ const handleResponse = async (response) => {
         throw new Error('Sesión expirada');
     }
     if (!response.ok) {
-        throw new Error('Error al realizar la petición');
+        let errorMessage = 'Error al realizar la petición';
+        try {
+            const errorData = await response.json();
+            errorMessage = JSON.stringify(errorData); // O una propiedad específica si sabes cuál es
+            console.error("Backend Error Details:", errorData);
+        } catch (e) {
+            // Si no es JSON, texto plano?
+            try {
+                const textError = await response.text();
+                if (textError) errorMessage = textError;
+            } catch (ignore) { }
+        }
+        throw new Error(errorMessage);
     }
     if (response.status === 204) {
         return null;

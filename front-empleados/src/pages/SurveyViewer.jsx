@@ -27,6 +27,19 @@ const SurveyViewer = ({ embeddedId }) => {
     const [availableBarrios, setAvailableBarrios] = useState([]);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [processingQuestions, setProcessingQuestions] = useState(new Set());
+
+    const handleProcessingStatus = (qId, isProcessing) => {
+        setProcessingQuestions(prev => {
+            const next = new Set(prev);
+            if (isProcessing) {
+                next.add(qId);
+            } else {
+                next.delete(qId);
+            }
+            return next;
+        });
+    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -69,7 +82,7 @@ const SurveyViewer = ({ embeddedId }) => {
         e.preventDefault();
 
         // Prevent double submission
-        if (isSubmitting) return;
+        if (isSubmitting || processingQuestions.size > 0) return;
 
         for (const q of survey.preguntas) {
             if (q.obligatoria && (!answers[q.id] || (Array.isArray(answers[q.id]) && answers[q.id].length === 0))) {
@@ -237,7 +250,7 @@ const SurveyViewer = ({ embeddedId }) => {
                                             case 'texto': return <QuestionViewerText question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'numero': return <QuestionViewerNumber question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'opciones': return <QuestionViewerOptions question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
-                                            case 'foto': return <QuestionViewerPhoto question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
+                                            case 'foto': return <QuestionViewerPhoto question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} onProcessingStatus={handleProcessingStatus} />;
                                             case 'telefono': return <QuestionViewerPhone question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'celular': return <QuestionViewerPhone question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
                                             case 'nombre': return <QuestionViewerText question={q} value={val} onChange={(v) => handleAnswerChange(q.id, v)} />;
@@ -254,10 +267,10 @@ const SurveyViewer = ({ embeddedId }) => {
                     <div className="mt-8">
                         <MyButton
                             type="submit"
-                            disabled={isSubmitting}
-                            className="bg-brand-blue text-white hover:bg-brand-blue/90 py-3 shadow-lg shadow-blue-500/30 w-full transition-all"
+                            disabled={isSubmitting || processingQuestions.size > 0}
+                            className={`bg-brand-blue text-white hover:bg-brand-blue/90 py-3 shadow-lg shadow-blue-500/30 w-full transition-all ${processingQuestions.size > 0 ? 'opacity-75 cursor-not-allowed' : ''}`}
                         >
-                            {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                            {processingQuestions.size > 0 ? 'Procesando imágenes...' : (isSubmitting ? 'Enviando...' : 'Enviar Respuestas')}
                         </MyButton>
                     </div>
                 </form>

@@ -4,10 +4,11 @@ import ChartCard from '../components/Analytics/ChartCard';
 import { getAllSurveys, getSurvey, getSurveyResponses, updateResponse, deleteResponse } from '../api';
 import {
     ArrowLeft, Loader, FileText, Calendar, Download, ChevronLeft, ChevronRight,
-    X, MapPin, User, Edit2, Save, Eye, Trash2
+    X, MapPin, User, Edit2, Save, Eye, Trash2, RefreshCcw, Camera, Image as ImageIcon, Loader2
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import ImageCarousel from '../components/ui/ImageCarousel';
+import imageCompression from 'browser-image-compression';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -33,6 +34,47 @@ export default function RespuestasDashboard() {
     const [editForm, setEditForm] = useState({ seccion: '', barrio: '', respuestas: {} });
     const [photosToDelete, setPhotosToDelete] = useState([]);
     const [saving, setSaving] = useState(false);
+    const [rotatedImages, setRotatedImages] = useState({}); // { [imgId]: degrees }
+    const [newPhotos, setNewPhotos] = useState({}); // { [questionId]: [File, ...] }
+    const [processingCount, setProcessingCount] = useState(0);
+
+    // --- HELPER DE ROTACIÓN (Canvas) ---
+    const getRotatedFile = (imageUrl, degrees) => {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.crossOrigin = "anonymous";
+            image.src = imageUrl;
+            // Evitar caché para que el canvas no se ensucie
+            image.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Si rotamos 90 o 270, invertimos dimensiones
+                if (degrees % 180 !== 0) {
+                    canvas.width = image.naturalHeight;
+                    canvas.height = image.naturalWidth;
+                } else {
+                    canvas.width = image.naturalWidth;
+                    canvas.height = image.naturalHeight;
+                }
+
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((degrees * Math.PI) / 180);
+                ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Canvas is empty'));
+                        return;
+                    }
+                    resolve(new File([blob], "foto_rotada.jpg", { type: "image/jpeg" }));
+                }, 'image/jpeg', 0.9);
+            };
+            image.onerror = (err) => reject(err);
+        });
+    };
 
     // --- CONFIGURACIÓN DE PAGINACIÓN ---
     const [paginaActual, setPaginaActual] = useState(1);
@@ -144,12 +186,134 @@ export default function RespuestasDashboard() {
             respuestas: initialRespuestas
         });
         setPhotosToDelete([]);
+        setRotatedImages({});
+        setNewPhotos({});
+    };
+
+    const handleRotate = (imgId) => {
+        setRotatedImages(prev => ({
+            ...prev,
+            [imgId]: (prev[imgId] || 0) + 90
+        }));
+    };
+
+    const handleFileChangeHelper = async (e, questionId) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const selectedFiles = Array.from(e.target.files);
+            setProcessingCount(prev => prev + selectedFiles.length);
+
+            const options = {
+                maxSizeMB: 0.8,
+                maxWidthOrHeight: 1280,
+                useWebWorker: true
+            };
+
+            try {
+                const compressedFiles = [];
+                for (const file of selectedFiles) {
+                    if (file.type.startsWith('image/')) {
+                        try {
+                            const compressed = await imageCompression(file, options);
+                            compressedFiles.push(compressed);
+                        } catch (err) {
+                            console.error("Error compression", err);
+                            compressedFiles.push(file); // Fallback
+                        }
+                    } else {
+                        compressedFiles.push(file);
+                    }
+                }
+
+                setNewPhotos(prev => ({
+                    ...prev,
+                    [questionId]: [...(prev[questionId] || []), ...compressedFiles]
+                }));
+            } catch (error) {
+                console.error("Error global processing files:", error);
+            } finally {
+                setProcessingCount(prev => Math.max(0, prev - selectedFiles.length));
+                e.target.value = '';
+            }
+        }
+    };
+
+    const handleRemoveNewPhoto = (questionId, index) => {
+        setNewPhotos(prev => {
+            const current = prev[questionId] || [];
+            const updated = current.filter((_, i) => i !== index);
+            return { ...prev, [questionId]: updated };
+        });
     };
 
     const handleSaveResponse = async () => {
+        if (processingCount > 0) return; // Prevent save while processing
         setSaving(true);
         try {
-            await updateResponse(selectedResponse.id, editForm, photosToDelete);
+            // 1. Preparar Payload Base
+            // Transformar el objeto respuestas {id: val} a array de detalles [{pregunta_id, valor}]
+            // que es lo que espera RespuestaUpdateSerializer
+            const detallesPayload = Object.entries(editForm.respuestas).map(([pId, val]) => ({
+                pregunta_id: parseInt(pId),
+                valor: val
+            }));
+
+            const jsonPayload = {
+                // ...editForm, // No enviamos todo editForm crudo
+                detalles: detallesPayload,
+                seccion: editForm.seccion,
+                barrio: editForm.barrio,
+                delete_extra_ids: [...photosToDelete]
+            };
+
+            const formData = new FormData();
+
+            // 2. Procesar Rotaciones
+            const rotationPromises = [];
+
+            // Necesitamos saber a qué pregunta pertenece cada imagen rotada
+            for (const detalle of selectedResponse.detalles) {
+                const extraFotos = detalle.fotos_extra || [];
+                const legacyFoto = detalle.valor_foto ? [{ id: detalle.id, imagen: detalle.valor_foto, isLegacy: true }] : [];
+                const allFotos = [...extraFotos, ...legacyFoto];
+
+                for (const foto of allFotos) {
+                    const definitionId = foto.isLegacy ? foto.id : foto.id;
+                    const deg = rotatedImages[definitionId];
+                    if (deg && deg % 360 !== 0) {
+                        // A. Marcar original para borrado
+                        if (!foto.isLegacy) {
+                            if (!jsonPayload.delete_extra_ids.includes(definitionId)) {
+                                jsonPayload.delete_extra_ids.push(definitionId);
+                            }
+                        } else {
+                            if (!jsonPayload.delete_legacy_detail_ids) jsonPayload.delete_legacy_detail_ids = [];
+                            jsonPayload.delete_legacy_detail_ids.push(definitionId);
+                        }
+
+                        // B. Generar archivo nuevo
+                        const p = getRotatedFile(getSecureUrl(foto.imagen || foto.url), deg).then(file => {
+                            formData.append(`foto_${detalle.pregunta}`, file);
+                        });
+                        rotationPromises.push(p);
+                    }
+                }
+            }
+
+            await Promise.all(rotationPromises);
+
+            // 3. Append Nuevas Fotos (Uploads)
+            Object.entries(newPhotos).forEach(([qId, files]) => {
+                files.forEach(file => {
+                    formData.append(`foto_${qId}`, file);
+                });
+            });
+
+            // 4. Append JSON Data
+            // Usamos el campo 'data' que nuestro backend modificado sabrá parsear
+            formData.append('data', JSON.stringify(jsonPayload));
+
+            // 5. Enviar
+            await updateResponse(selectedResponse.id, formData);
             alert("Respuesta actualizada correctamente");
 
             // Recargar datos para ver cambios
@@ -500,9 +664,12 @@ export default function RespuestasDashboard() {
 
                             {/* Desglose de Preguntas */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {selectedResponse.detalles.map((d, idx) => {
-                                    const preg = preguntas.find(p => p.id === d.pregunta);
-                                    const pregTitulo = preg?.titulo || `Pregunta ${d.pregunta}`;
+                                {preguntas.map((preg, idx) => {
+                                    // Buscar respuesta existente para esta pregunta (Loose equality allows string/number match)
+                                    const d = selectedResponse.detalles.find(det => det.pregunta == preg.id) || {};
+
+                                    const pregTitulo = preg.titulo;
+
                                     // Preparar imagenes
                                     let images = [];
                                     if (d.fotos_extra && d.fotos_extra.length > 0) {
@@ -517,18 +684,29 @@ export default function RespuestasDashboard() {
                                     }
 
                                     const hasPhotos = images.length > 0;
+                                    const hasTextValue = d.valor_texto || d.valor_numero !== null && d.valor_numero !== undefined;
+
+                                    // Si NO estamos editando y NO hay respuesta, NO mostrar.
+                                    // Usamos comprobar contenido real en lugar de solo ID para ser más robustos.
+                                    if (!isEditing && !hasPhotos && !hasTextValue) return null;
 
                                     return (
-                                        <div key={idx} className={`p-4 rounded-xl border border-border-base bg-white shadow-sm hover:shadow-md transition-shadow ${hasPhotos ? 'md:col-span-2' : ''}`}>
+                                        <div key={preg.id} className={`p-4 rounded-xl border border-border-base bg-white shadow-sm hover:shadow-md transition-shadow ${hasPhotos ? 'md:col-span-2' : ''}`}>
                                             <div className="text-xs font-bold text-brand-blue uppercase mb-2 tracking-wider">{pregTitulo}</div>
 
                                             {hasPhotos ? (
                                                 <div className="mt-2">
                                                     {isEditing ? (
                                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                            {/* 1. Imágenes Existentes */}
                                                             {images.map(img => (
                                                                 <div key={img.id} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-border-base">
-                                                                    <img src={getSecureUrl(img.url)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                                    <img
+                                                                        src={getSecureUrl(img.url)}
+                                                                        className="w-full h-full object-cover transition-transform duration-300"
+                                                                        style={{ transform: `rotate(${rotatedImages[img.id] || 0}deg)` }}
+                                                                    />
+
                                                                     <button
                                                                         onClick={() => {
                                                                             if (!img.isLegacy) {
@@ -537,16 +715,57 @@ export default function RespuestasDashboard() {
                                                                                 alert("No se puede borrar esta foto antigua en modo edición rápida. Contacte a soporte.");
                                                                             }
                                                                         }}
-                                                                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm"
+                                                                        className="absolute top-1 right-1 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm z-10"
                                                                         title="Borrar foto"
                                                                     >
-                                                                        <X size={14} />
+                                                                        <X size={18} />
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={() => handleRotate(img.id)}
+                                                                        className="absolute bottom-1 right-1 p-2 bg-brand-blue text-white rounded-full hover:bg-blue-600 shadow-sm z-10"
+                                                                        title="Rotar 90º"
+                                                                    >
+                                                                        <RefreshCcw size={18} />
                                                                     </button>
                                                                 </div>
                                                             ))}
-                                                            <div className="flex items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary text-xs text-center p-2">
-                                                                (Subida bloqueada en edición)
-                                                            </div>
+
+                                                            {/* 2. Nuevas Fotos Uploaded */}
+                                                            {(newPhotos[preg.id] || []).map((file, i) => (
+                                                                <div key={`new-${i}`} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-border-base border-brand-blue/50">
+                                                                    <img
+                                                                        src={URL.createObjectURL(file)}
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => handleRemoveNewPhoto(preg.id, i)}
+                                                                        className="absolute top-1 right-1 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm z-10"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+
+                                                            {/* 3. Botón Upload o Loading */}
+                                                            {processingCount > 0 ? (
+                                                                <div className="aspect-square rounded-lg border border-dashed border-brand-blue/30 bg-brand-blue/5 flex flex-col items-center justify-center animate-pulse">
+                                                                    <Loader2 className="animate-spin text-brand-blue mb-1" size={24} />
+                                                                    <span className="text-[10px] text-brand-blue font-black uppercase text-center px-1">Procesando</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="relative aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary hover:text-brand-blue hover:border-brand-blue transition-all cursor-pointer group">
+                                                                    <Camera size={24} className="group-hover:scale-110 transition-transform" />
+                                                                    <span className="text-[10px] font-bold mt-1">Añadir</span>
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        multiple
+                                                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                                                        onChange={(e) => handleFileChangeHelper(e, preg.id)}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <ImageCarousel images={images} />
@@ -555,23 +774,61 @@ export default function RespuestasDashboard() {
                                             ) : (
                                                 <div className="text-content-primary font-medium text-base whitespace-pre-wrap">
                                                     {isEditing ? (
-                                                        preg?.tipo === 'numero' ? (
+                                                        preg?.tipo === 'foto' ? (
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
+                                                                {/* Nuevas Fotos en pregunta vacía */}
+                                                                {(newPhotos[preg.id] || []).map((file, i) => (
+                                                                    <div key={`new-${i}`} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-border-base border-brand-blue/50">
+                                                                        <img
+                                                                            src={URL.createObjectURL(file)}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => handleRemoveNewPhoto(preg.id, i)}
+                                                                            className="absolute top-1 right-1 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm z-10"
+                                                                        >
+                                                                            <X size={18} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+
+                                                                {/* Botón Upload o Loading */}
+                                                                {processingCount > 0 ? (
+                                                                    <div className="aspect-square rounded-lg border border-dashed border-brand-blue/30 bg-brand-blue/5 flex flex-col items-center justify-center animate-pulse">
+                                                                        <Loader2 className="animate-spin text-brand-blue mb-1" size={24} />
+                                                                        <span className="text-[10px] text-brand-blue font-black uppercase text-center px-1">Procesando</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="relative aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary hover:text-brand-blue hover:border-brand-blue transition-all cursor-pointer group">
+                                                                        <Camera size={24} className="group-hover:scale-110 transition-transform" />
+                                                                        <span className="text-[10px] font-bold mt-1">Añadir</span>
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="image/*"
+                                                                            multiple
+                                                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                                                            onChange={(e) => handleFileChangeHelper(e, preg.id)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : preg?.tipo === 'numero' ? (
                                                             <input
                                                                 type="number"
                                                                 className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none"
-                                                                value={editForm.respuestas[d.pregunta] || ""}
+                                                                value={editForm.respuestas[preg.id] || ""}
                                                                 onChange={e => setEditForm({
                                                                     ...editForm,
-                                                                    respuestas: { ...editForm.respuestas, [d.pregunta]: e.target.value }
+                                                                    respuestas: { ...editForm.respuestas, [preg.id]: e.target.value }
                                                                 })}
                                                             />
                                                         ) : (
                                                             <textarea
                                                                 className="w-full px-3 py-2 border border-border-base rounded-md focus:ring-2 focus:ring-brand-blue/20 outline-none min-h-[80px]"
-                                                                value={editForm.respuestas[d.pregunta] || ""}
+                                                                value={editForm.respuestas[preg.id] || ""}
                                                                 onChange={e => setEditForm({
                                                                     ...editForm,
-                                                                    respuestas: { ...editForm.respuestas, [d.pregunta]: e.target.value }
+                                                                    respuestas: { ...editForm.respuestas, [preg.id]: e.target.value }
                                                                 })}
                                                             />
                                                         )
@@ -600,11 +857,12 @@ export default function RespuestasDashboard() {
                                     </button>
                                     <button
                                         onClick={handleSaveResponse}
-                                        disabled={saving}
-                                        className="px-6 py-2 bg-brand-blue text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-brand-blue/20 flex items-center gap-2"
+                                        disabled={saving || processingCount > 0}
+                                        className={`px-6 py-2 bg-brand-blue text-white rounded-lg font-bold transition-all shadow-lg shadow-brand-blue/20 flex items-center gap-2 ${processingCount > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                                     >
                                         {saving ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
-                                        Guardar Cambios
+                                        {processingCount > 0 ? "Procesando..." : "Guardar Cambios"}
+
                                     </button>
                                 </>
                             ) : (
