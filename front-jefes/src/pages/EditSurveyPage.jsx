@@ -23,6 +23,7 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
     const [survey, setSurvey] = useState(null);
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
+    const [saving, setSaving] = useState(false);
 
     // Estados para Header
     const [title, setTitle] = useState("");
@@ -125,7 +126,10 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
             return;
         }
 
+        if (saving) return; // Prevent double click
+        setSaving(true);
         setMsg("Guardando cambios...");
+
         try {
             // 0. Guardar Header
             const headerPayload = {
@@ -155,7 +159,8 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
                         orden: correctOrder,
                         opciones: q.opciones,
                         activa: true,
-                        obligatoria: q.obligatoria || false
+                        obligatoria: q.obligatoria || false,
+                        permite_multiple: q.permite_multiple || false // AÑADIDO
                     };
                     return createQuestion(payload);
                 } else {
@@ -164,7 +169,8 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
                         titulo: q.titulo,
                         opciones: q.opciones,
                         orden: correctOrder,
-                        obligatoria: q.obligatoria || false
+                        obligatoria: q.obligatoria || false,
+                        permite_multiple: q.permite_multiple || false // AÑADIDO
                     };
                     return updateQuestion(q.id, payload);
                 }
@@ -182,6 +188,8 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
             console.error(error);
             alert("Error al guardar: " + error.message);
             setMsg("❌ Error");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -232,9 +240,9 @@ const EditSurveyPage = ({ isRelevamiento = false }) => {
                 </div>
 
                 {/* Adaptado: bg-brand-blue */}
-                <MyButton onClick={handleSaveAll} className="!w-auto bg-brand-blue hover:bg-brand-blue/90 text-white shadow-lg shadow-blue-900/20 flex items-center gap-2 px-3 md:px-6">
-                    <Save size={20} />
-                    <span className="hidden md:inline">Guardar Todo</span>
+                <MyButton onClick={handleSaveAll} disabled={saving} className="!w-auto bg-brand-blue hover:bg-brand-blue/90 text-white shadow-lg shadow-blue-900/20 flex items-center gap-2 px-3 md:px-6">
+                    {saving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
+                    <span className="hidden md:inline">{saving ? "Guardando..." : "Guardar Todo"}</span>
                 </MyButton>
             </div>
 

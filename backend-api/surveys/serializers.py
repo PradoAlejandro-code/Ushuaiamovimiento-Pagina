@@ -4,12 +4,12 @@ from .models import Encuesta, Pregunta, RespuestaHeader, RespuestaDetalle, Secci
 class PreguntaNestedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pregunta
-        fields = ['id', 'titulo', 'orden', 'tipo', 'opciones', 'activa', 'obligatoria']
+        fields = ['id', 'titulo', 'orden', 'tipo', 'opciones', 'activa', 'obligatoria', 'permite_multiple']
 
 class PreguntaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pregunta
-        fields = ['id', 'encuesta', 'titulo', 'orden', 'tipo', 'opciones', 'activa', 'obligatoria']
+        fields = ['id', 'encuesta', 'titulo', 'orden', 'tipo', 'opciones', 'activa', 'obligatoria', 'permite_multiple']
 
 class EncuestaCreateSerializer(serializers.ModelSerializer):
     preguntas = PreguntaNestedSerializer(many=True)

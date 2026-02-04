@@ -7,6 +7,7 @@ import EditSurveyPage from './pages/EditSurveyPage';
 import ContactViewerPage from './pages/ContactViewerPage';
 import RespuestasDashboard from './pages/RespuestasDashboard';
 import DashboardLayout from './layouts/DashboardLayout';
+import { useSessionExtender } from './hooks/useSessionExtender';
 
 // Componente que protege la ruta
 const ProtectedRoute = ({ children }) => {
@@ -22,6 +23,9 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+    // Activate Sliding Session Logic
+    useSessionExtender();
+
     // ESTADO DE CARGA: Esto es lo que falta en tu código actual
     const [loading, setLoading] = useState(true);
 

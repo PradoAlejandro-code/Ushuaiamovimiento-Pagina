@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
-from users.views import CustomTokenObtainPairView
+from users.views import CustomTokenObtainPairView, extend_session_view
 
 urlpatterns = [
     # --- Rutas Administrativas ---
@@ -13,6 +13,7 @@ urlpatterns = [
     # --- Autenticación (JWT) ---
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/extend-session/', extend_session_view, name='extend_session'),
 
     # --- Tus Apps ---
     path('api/surveys/', include('surveys.urls')),

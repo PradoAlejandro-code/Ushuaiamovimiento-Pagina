@@ -53,6 +53,7 @@ class Pregunta(models.Model):
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_TEXTO)
     activa = models.BooleanField(default=True, help_text="Si es False, la pregunta no se muestra pero no se borran sus datos.")
     obligatoria = models.BooleanField(default=False)
+    permite_multiple = models.BooleanField(default=False)
     
     opciones = models.JSONField(null=True, blank=True, help_text='Lista de opciones ej: ["Si", "No"]')
 
@@ -74,7 +75,7 @@ class Contacto(models.Model):
         return f"{self.nombre} ({self.celular})"
 
 class RespuestaHeader(models.Model):
-    encuesta = models.ForeignKey(Encuesta, on_delete=models.PROTECT, related_name='respuestas')
+    encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name='respuestas')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='encuestas_respondidas')
     # Relación de clave foránea vinculada
     contacto = models.ForeignKey(Contacto, on_delete=models.SET_NULL, null=True, blank=True, related_name="encuestas_respondidas")
@@ -91,7 +92,7 @@ class RespuestaHeader(models.Model):
 
 class RespuestaDetalle(models.Model):
     header = models.ForeignKey(RespuestaHeader, on_delete=models.CASCADE, related_name='detalles')
-    pregunta = models.ForeignKey(Pregunta, on_delete=models.PROTECT, related_name='respuestas_recibidas')
+    pregunta = models.ForeignKey(Pregunta, on_delete=models.CASCADE, related_name='respuestas_recibidas')
     
     # Separación de Valores para Analytics
     valor_texto = models.TextField(null=True, blank=True)

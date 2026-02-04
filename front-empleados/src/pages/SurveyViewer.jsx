@@ -26,6 +26,8 @@ const SurveyViewer = ({ embeddedId }) => {
     const [availableLocations, setAvailableLocations] = useState([]);
     const [availableBarrios, setAvailableBarrios] = useState([]);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     useEffect(() => {
         const loadData = async () => {
             if (!activeId) return;
@@ -65,6 +67,10 @@ const SurveyViewer = ({ embeddedId }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Prevent double submission
+        if (isSubmitting) return;
+
         for (const q of survey.preguntas) {
             if (q.obligatoria && (!answers[q.id] || (Array.isArray(answers[q.id]) && answers[q.id].length === 0))) {
                 alert(`⚠️ La pregunta "${q.titulo}" es obligatoria.`);
@@ -73,6 +79,8 @@ const SurveyViewer = ({ embeddedId }) => {
                 return;
             }
         }
+
+        setIsSubmitting(true);
 
         const respuestasList = [];
         const filesToUpload = {};
@@ -123,12 +131,13 @@ const SurveyViewer = ({ embeddedId }) => {
         } catch (err) {
             console.error(err);
             alert(`❌ Error al enviar respuestas: ${err.message}`);
+            setIsSubmitting(false); // Only re-enable on error
         }
     };
 
     // CORRECCIÓN: Pantalla de carga sincronizada con el tema
     if (loading) return (
-        <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-surface-secondary transition-colors duration-300">
+        <div className="w-full py-20 flex flex-col justify-center items-center bg-transparent transition-colors duration-300">
             <Loader className="animate-spin text-brand-blue mb-4" size={48} />
             <p className="text-content-secondary font-medium animate-pulse">Cargando encuesta...</p>
         </div>
@@ -149,12 +158,12 @@ const SurveyViewer = ({ embeddedId }) => {
     if (!survey) return null;
 
     return (
-        <div className="min-h-screen bg-surface-secondary py-4 px-4 md:py-8 transition-colors duration-300">
-            <div className="max-w-2xl mx-auto">
-                <Card className="mb-6 border-l-4 border-l-brand-blue">
-                    <h1 className="text-2xl font-bold text-content-primary mb-2">{survey.nombre}</h1>
-                    <p className="text-content-secondary">{survey.descripcion}</p>
-                </Card>
+        <div className={embeddedId
+            ? "w-full bg-transparent transition-colors duration-300"
+            : "min-h-screen bg-surface-secondary py-4 px-4 md:py-8 transition-colors duration-300"
+        }>
+            <div className={embeddedId ? "w-full" : "max-w-2xl mx-auto"}>
+
 
                 <form onSubmit={handleSubmit}>
                     {survey.requiere_ubicacion && (
@@ -208,7 +217,7 @@ const SurveyViewer = ({ embeddedId }) => {
                             <div>
                                 <label className="block text-xs font-semibold text-content-secondary uppercase mb-1">Selecciona Fecha y Hora</label>
                                 <input
-                                    type="datetime-local"
+                                    type="date"
                                     className="w-full p-3 rounded-lg border border-border-base focus:ring-2 focus:ring-brand-blue/50 outline-none bg-surface-primary text-content-primary transition-colors"
                                     value={customDate}
                                     onChange={(e) => setCustomDate(e.target.value)}
@@ -243,8 +252,12 @@ const SurveyViewer = ({ embeddedId }) => {
                     </div>
 
                     <div className="mt-8">
-                        <MyButton type="submit" className="bg-brand-blue text-white hover:bg-brand-blue/90 py-3 shadow-lg shadow-blue-500/30 w-full transition-all">
-                            Enviar Respuestas
+                        <MyButton
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="bg-brand-blue text-white hover:bg-brand-blue/90 py-3 shadow-lg shadow-blue-500/30 w-full transition-all"
+                        >
+                            {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
                         </MyButton>
                     </div>
                 </form>

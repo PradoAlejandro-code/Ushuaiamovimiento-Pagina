@@ -7,7 +7,13 @@ const DashboardLayout = () => {
     const location = useLocation();
 
     const [theme, setTheme] = useState(() => {
-        return localStorage.getItem('theme') || 'light';
+        // Prioritize Cookie for cross-domain sync
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        };
+        return getCookie('theme') || localStorage.getItem('theme') || 'light';
     });
 
     // Sincronizar con la etiqueta HTML <html> para evitar flash y asegurar persistencia
@@ -20,6 +26,10 @@ const DashboardLayout = () => {
 
     const toggleTheme = (newTheme) => {
         setTheme(newTheme);
+        // 1. Local Storage
+        localStorage.setItem('theme', newTheme);
+        // 2. Global Cookie for Subdomains
+        document.cookie = `theme=${newTheme}; path=/; domain=.ushuaiamovimiento.com.ar; max-age=31536000; SameSite=Lax`;
     };
 
     const menuItems = [

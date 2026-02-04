@@ -1,0 +1,58 @@
+@layer base {
+    :root {
+        --background: #ffffff;
+        --foreground: #111827;
+
+        --card: #ffffff;
+        --card-foreground: #111827;
+
+        --primary: #FF9415;
+        /* Orange */
+        --primary-foreground: #ffffff;
+
+        --secondary: #f3f4f6;
+        --secondary-foreground: #4b5563;
+
+        --muted: #9ca3af;
+        --muted-foreground: #6b7280;
+
+        --input: #fff7ed;
+        --input-foreground: #111827;
+
+        --border: #d1d5db;
+        --ring: #FF9415;
+
+        /* Contrast color for active/selection states */
+        --active-color: #1B76BB;
+        /* Blue for Light Mode */
+    }
+
+    .dark {
+        --background: #1a1a1a;
+        /* Black/Dark Grey */
+        --foreground: #ffffff;
+
+        --card: #2d2d2d;
+        --card-foreground: #ffffff;
+
+        --primary: #1B76BB;
+        /* Blue (swapped from Orange) */
+        --primary-foreground: #ffffff;
+
+        --secondary: #374151;
+        --secondary-foreground: #9ca3af;
+
+        --muted: #6b7280;
+        --muted-foreground: #9ca3af;
+
+        --input: #374151;
+        --input-foreground: #ffffff;
+
+        --border: #4b5563;
+        --ring: #1B76BB;
+
+        /* Contrast color for active/selection states */
+        --active-color: #FF9415;
+        /* Orange for Dark Mode */
+    }
+}

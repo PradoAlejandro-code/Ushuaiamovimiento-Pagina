@@ -8,6 +8,18 @@ from .models import User
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        if email and password:
+            user_obj = User.objects.filter(email=email).first()
+            if not user_obj:
+                raise serializers.ValidationError({"detail": "No existe una cuenta con este email."})
+            elif not user_obj.check_password(password):
+                raise serializers.ValidationError({"detail": "Contraseña incorrecta."})
+            elif not user_obj.is_active:
+                raise serializers.ValidationError({"detail": "Esta cuenta está desactivada."})
+
         data = super().validate(attrs)
         
         user = self.user
@@ -25,6 +37,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 accesos.append(nombre_limpio)
 
         data['accesos'] = accesos
+        
+        if not accesos:
+            raise serializers.ValidationError({"detail": "No tienes sectores asignados."})
         
         return data
 

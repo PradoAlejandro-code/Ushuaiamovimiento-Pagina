@@ -1,1 +1,30 @@
 @import "tailwindcss";
+@import "./themes.css";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-input: var(--input);
+    --color-input-foreground: var(--input-foreground);
+    --color-border: var(--border);
+    --color-ring: var(--ring);
+
+    /* New active color mapping */
+    --color-active: var(--active-color);
+}
+
+@layer base {
+    body {
+        @apply bg-background text-foreground;
+    }
+}

@@ -193,3 +193,19 @@ export const updateResponse = async (id, payload) => {
     });
     return handleResponse(response);
 };
+
+export const deleteResponse = async (id) => {
+    const response = await fetch(`${API_URL}/api/surveys/responses/${id}/`, {
+        method: 'DELETE',
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const extendSession = async () => {
+    const response = await fetch(`${API_URL}/api/auth/extend-session/`, {
+        method: 'POST',
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};

@@ -27,6 +27,7 @@ const CreateSurveyPage = () => {
     // Configuración
     const [esRelevamiento, setEsRelevamiento] = useState(false);
     const [requiereUbicacion, setRequiereUbicacion] = useState(false);
+    const [incluirFecha, setIncluirFecha] = useState(false);
 
     // Estado de las Preguntas
     const [questions, setQuestions] = useState([]);
@@ -81,11 +82,13 @@ const CreateSurveyPage = () => {
             activo: active,
             es_relevamiento: esRelevamiento,
             requiere_ubicacion: requiereUbicacion,
+            incluir_fecha: incluirFecha,
             preguntas: questions.map((q, index) => ({
                 titulo: q.titulo || "Sin título",
                 tipo: q.tipo,
                 orden: index + 1,
                 obligatoria: q.obligatoria,
+                permite_multiple: q.permite_multiple || false, // AÑADIDO
                 opciones: q.opciones
             }))
         };
@@ -148,6 +151,8 @@ const CreateSurveyPage = () => {
             <SurveySettingsCard
                 requiereUbicacion={requiereUbicacion}
                 setRequiereUbicacion={setRequiereUbicacion}
+                incluirFecha={incluirFecha}
+                setIncluirFecha={setIncluirFecha}
             />
 
             <div className="mb-8 space-y-6">

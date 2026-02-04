@@ -91,3 +91,11 @@ export const getLocations = async () => {
     });
     return handleResponse(response);
 };
+
+export const extendSession = async () => {
+    const response = await fetch(`${API_URL}/api/auth/extend-session/`, {
+        method: 'POST',
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};

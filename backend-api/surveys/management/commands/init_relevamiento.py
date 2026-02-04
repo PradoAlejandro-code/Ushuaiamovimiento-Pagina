@@ -18,7 +18,7 @@ class Command(BaseCommand):
         if created:
             self.stdout.write(self.style.SUCCESS(f'Relevamiento creado: {relevamiento.nombre}'))
             # Crear preguntas básicas por defecto
-            Pregunta.objects.create(encuesta=relevamiento, titulo='Nombre Completo', orden=1, tipo='texto')
+            Pregunta.objects.create(encuesta=relevamiento, titulo='Nombre Completo', orden=1, tipo='nombre')
         else:
             self.stdout.write(self.style.WARNING(f'El Relevamiento ya existe: {relevamiento.nombre}'))
             # Asegurar que requiera ubicación

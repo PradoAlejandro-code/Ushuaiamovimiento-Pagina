@@ -144,13 +144,28 @@ class RespuestaCreateView(APIView):
                         except ValueError:
                             pass
                     
+                    from django.core.files.base import ContentFile
+
                     # Check for Photo
                     valor_foto = None
                     if is_multipart:
                         file_key = f"foto_{pregunta_id}"
-                        # Usar el primero para el campo legacy
+                        # Usar el primero para el campo legacy (pero CLONADO para no romper el archivo en disco)
                         if file_key in request.FILES:
-                            valor_foto = request.FILES.get(file_key)
+                            files_list = request.FILES.getlist(file_key)
+                            if files_list:
+                                first_f = files_list[0]
+                                try:
+                                    # Leemos en memoria para crear una copia independiente
+                                    # Esto evita que al guardar el 'detalle', Django mueva/borre el archivo temporal
+                                    first_f.seek(0)
+                                    content_copy = first_f.read()
+                                    first_f.seek(0) # Rebobinamos para el siguiente uso
+                                    valor_foto = ContentFile(content_copy, name=first_f.name)
+                                except Exception as e:
+                                    print(f"Error cloning file: {e}")
+                                    # Fallback: usaremos el original (riesgoso si se mueve, pero mejor que nada)
+                                    valor_foto = first_f
                                 
                     detalle = RespuestaDetalle.objects.create(
                         header=header,
@@ -549,7 +564,7 @@ class GlobalStatsView(APIView):
         return Response(data)
 
 
-class RespuestaUpdateView(generics.RetrieveUpdateAPIView):
+class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = RespuestaHeader.objects.all()
     serializer_class = RespuestaUpdateSerializer
     permission_classes = [IsAuthenticated]

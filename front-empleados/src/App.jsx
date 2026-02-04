@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SurveyViewer from "./pages/SurveyViewer";
 import Home from "./pages/Home";
+import { useSessionExtender } from './hooks/useSessionExtender';
 
 // 1. Ruta Protegida (El Guardia)
 const ProtectedRoute = ({ children }) => {
@@ -16,6 +17,9 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  // Activate Sliding Session Logic
+  useSessionExtender();
+
   // 2. Estado de Carga (Para evitar el parpadeo o expulsión inmediata)
   const [loading, setLoading] = useState(true);
 

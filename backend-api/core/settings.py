@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +26,11 @@ SECRET_KEY = 'django-insecure-bj-20b3a0u@vseyd6(otyh4+fuf#=o3b67z^wa1i!-+qw0r3pa
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['api.ushuaiamovimiento.com.ar', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = [
+    'api.ushuaiamovimiento.com.ar', 
+    'localhost', 
+    '127.0.0.1'
+]
 CSRF_TRUSTED_ORIGINS = ['https://api.ushuaiamovimiento.com.ar']
 
 # SSL Rewrite Settings
@@ -61,6 +66,8 @@ INSTALLED_APPS = [
     'users',
     'surveys',
     'django_cleanup.apps.CleanupConfig',
+    'easy_thumbnails',
+    'image_cropping',
 ]
 
 MIDDLEWARE = [
@@ -167,8 +174,26 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
 }
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
+# FILE UPLOAD SETTINGS
+# 50 MB limit for uploads (Essential for multiple photo uploads)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+
+# SLIDING SESSION CONFIGURATION
+# 1 hour in seconds (60s * 60m)
+SESSION_COOKIE_AGE = 3600 
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_DOMAIN = ".ushuaiamovimiento.com.ar"
+SESSION_COOKIE_NAME = "sessionid" # Explicit naming for clarity
 
 # Media Config
 MEDIA_URL = '/media/'

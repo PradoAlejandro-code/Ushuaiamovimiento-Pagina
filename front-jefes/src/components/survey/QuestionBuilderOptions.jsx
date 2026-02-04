@@ -97,9 +97,8 @@ const QuestionBuilderOptions = ({ question, onChange, onDelete, onSave }) => {
                     </button>
                 </div>
 
-                {/* 3. Checkbox Obligatoria */}
-                <div className="flex items-center gap-2 pt-2 border-t border-border-base">
-                    {/* 8. Quité 'transition-colors' */}
+                <div className="flex items-center gap-6 pt-2 border-t border-border-base">
+                    {/* 8. Checkbox Obligatoria */}
                     <label className="flex items-center gap-2 cursor-pointer text-sm text-content-secondary hover:text-content-primary">
                         <input
                             type="checkbox"
@@ -108,6 +107,17 @@ const QuestionBuilderOptions = ({ question, onChange, onDelete, onSave }) => {
                             onChange={(e) => handleChange('obligatoria', e.target.checked)}
                         />
                         <span>Respuesta obligatoria</span>
+                    </label>
+
+                    {/* 9. Checkbox Múltiple */}
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-content-secondary hover:text-content-primary">
+                        <input
+                            type="checkbox"
+                            className="w-4 h-4 text-purple-500 rounded border-gray-300 focus:ring-purple-500 accent-purple-500"
+                            checked={question.permite_multiple || false}
+                            onChange={(e) => handleChange('permite_multiple', e.target.checked)}
+                        />
+                        <span>Permitir selección múltiple</span>
                     </label>
                 </div>
             </div>

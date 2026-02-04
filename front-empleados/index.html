@@ -8,22 +8,19 @@
   <title>Ushuaia Movimiento</title>
   <script>
     (function () {
-      // 1. Buscamos el tema guardado
-      const savedTheme = localStorage.getItem('theme');
-      // 2. Si no hay nada guardado, usamos la preferencia del sistema (opcional)
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const getThemeFromCookie = () => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; theme=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      };
 
-      // Decidimos el tema: si existe el guardado lo usamos, si no, intentamos light por defecto
-      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+      const theme = getThemeFromCookie() || localStorage.getItem('theme') || 'light';
 
       if (theme === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
-
-      // OPCIONAL: Evita el parpadeo de color blanco antes de que cargue el CSS
-      // Pero lo ideal es que las variables CSS se encarguen de esto
     })();
   </script>
 </head>

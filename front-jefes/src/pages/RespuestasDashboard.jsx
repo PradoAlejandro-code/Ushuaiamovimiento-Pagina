@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { procesarDatosParaGraficos, procesarParticipacionPorUsuario } from '../utils/analyticsHelpers';
 import ChartCard from '../components/Analytics/ChartCard';
-import { getAllSurveys, getSurvey, getSurveyResponses, updateResponse } from '../api';
+import { getAllSurveys, getSurvey, getSurveyResponses, updateResponse, deleteResponse } from '../api';
 import {
     ArrowLeft, Loader, FileText, Calendar, Download, ChevronLeft, ChevronRight,
-    X, MapPin, User, Edit2, Save, Eye
+    X, MapPin, User, Edit2, Save, Eye, Trash2
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import ImageCarousel from '../components/ui/ImageCarousel';
@@ -161,6 +161,28 @@ export default function RespuestasDashboard() {
             alert("Error al guardar los cambios.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDeleteResponse = async () => {
+        if (!selectedResponse) return;
+
+        if (window.confirm("¿Estás seguro de que deseas eliminar esta respuesta? Esta acción no se puede deshacer.")) {
+            setSaving(true);
+            try {
+                await deleteResponse(selectedResponse.id);
+                alert("🗑️ Respuesta eliminada correctamente");
+
+                // Recargar datos
+                await verDetalleEncuesta(encuestaSeleccionada);
+                setSelectedResponse(null);
+                setIsEditing(false);
+            } catch (error) {
+                console.error("Error eliminando:", error);
+                alert("❌ Error al eliminar la respuesta.");
+            } finally {
+                setSaving(false);
+            }
         }
     };
 
@@ -411,13 +433,23 @@ export default function RespuestasDashboard() {
                             </div>
                             <div className="flex items-center gap-2">
                                 {!isEditing && (
-                                    <button
-                                        onClick={handleEditClick}
-                                        className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-full transition-colors"
-                                        title="Editar Respuesta"
-                                    >
-                                        <Edit2 size={20} />
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={handleDeleteResponse}
+                                            disabled={saving}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                            title="Eliminar Respuesta"
+                                        >
+                                            {saving ? <Loader size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                                        </button>
+                                        <button
+                                            onClick={handleEditClick}
+                                            className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-full transition-colors"
+                                            title="Editar Respuesta"
+                                        >
+                                            <Edit2 size={20} />
+                                        </button>
+                                    </>
                                 )}
                                 <button
                                     onClick={() => { setSelectedResponse(null); setIsEditing(false); }}
