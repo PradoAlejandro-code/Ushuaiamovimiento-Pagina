@@ -102,8 +102,11 @@ const SurveyViewer = ({ embeddedId }) => {
             const val = answers[q.id];
             if (val === undefined || val === null || val === "") continue;
             else if (q.tipo === 'foto') {
+                // CAMBIO: Usamos Blob en lugar de File para máxima compatibilidad
                 if (Array.isArray(val)) {
                     filesToUpload[q.id] = val;
+                } else if (val instanceof Blob) {
+                    filesToUpload[q.id] = [val];
                 } else if (val instanceof File) {
                     filesToUpload[q.id] = [val];
                 }
@@ -126,8 +129,10 @@ const SurveyViewer = ({ embeddedId }) => {
             const formData = new FormData();
             formData.append('data', JSON.stringify(jsonData));
             Object.entries(filesToUpload).forEach(([qId, files]) => {
-                files.forEach(file => {
-                    formData.append(`foto_${qId}`, file);
+                files.forEach((file, index) => {
+                    // FORZAMOS NOMBRE Y EXTENSIÓN PARA CELULARES VIEJOS
+                    const fileName = `foto_${qId}_${Date.now()}_${index}.jpg`;
+                    formData.append(`foto_${qId}`, file, fileName);
                 });
             });
             finalPayload = formData;

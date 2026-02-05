@@ -609,7 +609,10 @@ class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):
                     detalle, created = RespuestaDetalle.objects.get_or_create(
                         header=header,
                         pregunta_id=pregunta_id,
-                        defaults={'encuesta_id': header.encuesta_id}
+                        defaults={
+                            'valor_texto': "",
+                            'valor_numero': None
+                        }
                     )
                     
                     # Guardar las fotos
