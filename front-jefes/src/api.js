@@ -10,7 +10,7 @@ const handleResponse = async (response) => {
         localStorage.removeItem('role');
         localStorage.removeItem('user_name');
         // Redirigimos al login principal si expira la sesión
-        window.location.href = 'https://ushuaiamovimiento.com.ar/login';
+        window.location.href = `${window.location.origin}/login`;
         throw new Error('Sesión expirada');
     }
     if (!response.ok) {
@@ -41,6 +41,8 @@ const getHeaders = () => {
         'Authorization': `Bearer ${token}`
     };
 };
+
+const getAuthToken = () => localStorage.getItem('access_token');
 
 // ... (El resto de tus funciones createSurvey, etc. déjalas igual) ...
 // Solo asegúrate de copiar las exportaciones que ya tenías abajo.
@@ -118,8 +120,8 @@ export const getRecentResponses = async () => {
 
 export const getSurveyContacts = async (id) => {
     const url = id
-        ? `${API_URL}/api/surveys/${id}/contactos/`
-        : `${API_URL}/api/surveys/contactos/all/`;
+        ? `${API_URL}/api/contacts/encuesta/${id}/`
+        : `${API_URL}/api/contacts/all/`;
 
     const response = await fetch(url, {
         headers: getHeaders()
@@ -141,50 +143,97 @@ export const getGlobalStats = async (period = 'day', groupBy = 'date') => {
     return handleResponse(response);
 };
 
-export const getContactosDb = async () => {
-    const response = await fetch(`${API_URL}/api/surveys/contactos/`, {
-        headers: getHeaders()
-    });
-    return handleResponse(response);
-};
+// --- GESTIÓN DE CONTACTOS (CRUD) ---
 
-export const saveContacto = async (contactoData) => {
-    const method = contactoData.id ? 'PUT' : 'POST';
-    const url = contactoData.id
-        ? `${API_URL}/api/surveys/contactos/${contactoData.id}/`
-        : `${API_URL}/api/surveys/contactos/`;
+// Obtener contactos, opcionalmente filtrados por encuesta
+export const getContacts = async (id = null) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No hay sesión activa");
+
+    const url = id
+        ? `${API_URL}/api/contacts/encuesta/${id}/`
+        : `${API_URL}/api/contacts/`;
 
     const response = await fetch(url, {
-        method: method,
-        headers: getHeaders(),
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('Error al obtener contactos');
+    }
+
+    return response.json();
+};
+
+// Crear o editar contacto
+export const saveContact = async (contactoData) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No hay sesión activa");
+
+    const isEdit = !!contactoData.id;
+    const url = isEdit
+        ? `${API_URL}/api/contacts/${contactoData.id}/`
+        : `${API_URL}/api/contacts/`;
+
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(contactoData)
     });
-    return handleResponse(response);
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(JSON.stringify(errorData));
+    }
+
+    return response.json();
 };
 
-export const deleteContacto = async (id) => {
-    const response = await fetch(`${API_URL}/api/surveys/contactos/${id}/`, {
+// Eliminar contacto
+export const deleteContact = async (id) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No hay sesión activa");
+
+    const response = await fetch(`${API_URL}/api/contacts/${id}/`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
     });
-    return handleResponse(response);
+
+    if (!response.ok) {
+        throw new Error('Error al eliminar contacto');
+    }
+
+    return true;
 };
 
-export const importContactos = async (archivo, tag) => {
-    const formData = new FormData();
-    formData.append('file', archivo);
-    formData.append('tag', tag);
+// Importar contactos (CSV)
+export const importContacts = async (formData) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No hay sesión activa");
 
-    // No enviamos Content-Type header manualmente con FormData, el navegador lo pone con el boundary
-    const token = localStorage.getItem('access_token');
-    const response = await fetch(`${API_URL}/api/surveys/contactos/importar/`, {
+    const response = await fetch(`${API_URL}/api/contacts/importar/`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`
         },
         body: formData
     });
-    return handleResponse(response);
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error en la importación');
+    }
+
+    return response.json();
 };
 
 export const updateResponse = async (id, payload) => {
@@ -217,6 +266,24 @@ export const deleteResponse = async (id) => {
 export const extendSession = async () => {
     const response = await fetch(`${API_URL}/api/auth/extend-session/`, {
         method: 'POST',
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const getDashboardStats = async (period = 'day', groupBy = 'user') => {
+    // Usamos el mismo patrón de URL y headers que ya tienes definido
+    const response = await fetch(`${API_URL}/api/surveys/stats/global/?period=${period}&group_by=${groupBy}`, {
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+/**
+ * Obtiene métricas rápidas adicionales si el backend las separa del resumen global.
+ */
+export const getQuickMetrics = async () => {
+    const response = await fetch(`${API_URL}/api/surveys/stats/quick/`, {
         headers: getHeaders()
     });
     return handleResponse(response);

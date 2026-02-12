@@ -63,22 +63,13 @@ class Pregunta(models.Model):
     def __str__(self):
         return f"{self.orden} - {self.titulo} ({self.encuesta.nombre})"
 
-class Contacto(models.Model):
-    nombre = models.CharField(max_length=255)
-    celular = models.CharField(max_length=20, unique=True) # El celular es el identificador único
-    email = models.EmailField(null=True, blank=True)
-    dni = models.CharField(max_length=20, null=True, blank=True)
-    tag = models.CharField(max_length=50, default="encuesta")
-    ultima_actualizacion = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"{self.nombre} ({self.celular})"
 
 class RespuestaHeader(models.Model):
     encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name='respuestas')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='encuestas_respondidas')
     # Relación de clave foránea vinculada
-    contacto = models.ForeignKey(Contacto, on_delete=models.SET_NULL, null=True, blank=True, related_name="encuestas_respondidas")
+    contacto = models.ForeignKey('contact.Contacto', on_delete=models.SET_NULL, null=True, blank=True, related_name="encuestas_respondidas")
 
     # Change: allow custom date, defaulting to now
     fecha_envio = models.DateTimeField(default=now)

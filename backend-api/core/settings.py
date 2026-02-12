@@ -37,10 +37,17 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
 CORS_ALLOW_ALL_ORIGINS = True # Development only
+
+CORS_ALLOWED_ORIGINS = [
+    "https://api.ushuaiamovimiento.com.ar",
+    "https://ushuaiamovimiento.com.ar",
+    "http://localhost:5173",
+    "http://localhost:5174",
+]
+
 CORS_ALLOWED_ORIGIN_REGEXES = [
     # Esto permite CUALQUIER subdominio en tu web (jefes, administracion, barrios, lo que inventes mañana)
     r"^https://\w+\.ushuaiamovimiento\.com\.ar$",
-    
     # Para tus pruebas locales
     r"^http://localhost:\d+$",
 ]
@@ -64,6 +71,8 @@ INSTALLED_APPS = [
     # Local
     'users',
     'surveys',
+    'report',
+    'contact',
     'django_cleanup.apps.CleanupConfig',
     'easy_thumbnails',
     'image_cropping',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, PlusCircle, LogOut, ClipboardList, Settings, Phone, BarChart, Sun, Moon } from 'lucide-react';
+import { Menu, X, Home, PlusCircle, LogOut, ClipboardList, Settings, Phone, BarChart, Sun, Moon, SquareChartGantt, ChevronDown } from 'lucide-react';
 
 const DashboardLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,6 +16,11 @@ const DashboardLayout = () => {
         return getCookie('theme') || localStorage.getItem('theme') || 'light';
     });
 
+    const [openMenus, setOpenMenus] = useState({});
+
+    const toggleMenu = (label) => {
+        setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+    };
     // Sincronizar con la etiqueta HTML <html> para evitar flash y asegurar persistencia
     useEffect(() => {
         const root = window.document.documentElement;
@@ -32,12 +37,36 @@ const DashboardLayout = () => {
         document.cookie = `theme=${newTheme}; path=/; domain=.ushuaiamovimiento.com.ar; max-age=31536000; SameSite=Lax`;
     };
 
+
     const menuItems = [
-        { path: '/', label: 'Dashboard', icon: Home },
-        { path: '/create-survey', label: 'Crear Encuesta', icon: PlusCircle },
-        { path: '/relevamiento', label: 'Relevamiento', icon: ClipboardList },
-        { path: '/surveys', label: 'Gestionar', icon: Settings },
-        { path: '/analytics', label: 'Analytics', icon: BarChart },
+        { path: '/', label: 'Inicio', icon: Home },
+        {
+            label: 'Relevamiento',
+            icon: SquareChartGantt,
+            isDropdown: true,
+            items: [
+                { path: '/relevamiento', label: 'Editar Relevamiento', icon: ClipboardList },
+                { path: '/relevamiento/responses', label: 'Respuestas', icon: ClipboardList },
+            ]
+        },
+        {
+            label: 'Encuestas',
+            icon: SquareChartGantt,
+            isDropdown: true,
+            items: [
+                { path: '/create-survey', label: 'Crear Encuesta', icon: PlusCircle },
+                { path: '/surveys', label: 'Editar/Respuestas', icon: PlusCircle },
+                { path: '/analytics', label: 'Analytics', icon: BarChart },
+            ]
+        },
+        {
+            label: 'Informes',
+            icon: SquareChartGantt,
+            isDropdown: true,
+            items: [
+                { path: '/create-report', label: 'Nuevo Informe', icon: ClipboardList },
+            ]
+        },
         { path: '/contacts', label: 'Contactos', icon: Phone },
     ];
 
@@ -81,11 +110,11 @@ const DashboardLayout = () => {
                 lg:!translate-x-0
             `}>
                 {/* Banner - Configurado para ancho completo */}
-                <div className="flex items-center justify-center px-6 py-6 min-h-[5rem]">
+                <div className="flex items-center justify-center px-4 py-4 min-h-[5rem]">
                     <img
                         src="/mopof-banner.png"
                         alt="MOPOF Banner"
-                        className="w-full h-auto object-contain dark:block hidden"
+                        className="w-full h-auto object-contain dark:block hidden rounded-xl transform scale-105"
                     />
                     <img
                         src="/mopof-banner.png"
@@ -98,15 +127,70 @@ const DashboardLayout = () => {
                 <nav className="p-4 space-y-2 mt-2 flex-1 overflow-y-auto">
                     {menuItems.map((item) => {
                         const Icon = item.icon;
+                        const isDropdown = item.isDropdown;
+                        const isOpen = openMenus[item.label];
                         const isActive = location.pathname === item.path;
+
+                        // --- OPCIÓN A: ES UN DESPLEGABLE ---
+                        if (isDropdown) {
+                            return (
+                                <div key={item.label} className="space-y-1">
+                                    <button
+                                        onClick={() => toggleMenu(item.label)}
+                                        className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-content-secondary hover:text-content-primary hover:bg-surface-primary/50 transition-all group"
+                                    >
+                                        <Icon size={20} className="group-hover:text-brand-orange transition-colors" />
+                                        <span className="font-medium tracking-wide">{item.label}</span>
+                                        <ChevronDown
+                                            size={16}
+                                            className={`ml-auto transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                        />
+                                    </button>
+
+                                    {/* Renderizado de los sub-items */}
+                                    {isOpen && (
+                                        <div className="ml-4 flex flex-col gap-1 border-l border-border-base pl-4 animate-in fade-in slide-in-from-top-1">
+                                            {item.items.map((subItem) => {
+                                                const SubIcon = subItem.icon;
+                                                const isSubActive = location.pathname === subItem.path;
+
+                                                return (
+                                                    <Link
+                                                        key={subItem.path}
+                                                        to={subItem.path}
+                                                        onClick={() => setSidebarOpen(false)}
+                                                        // USAMOS TUS CLASES ORIGINALES: text-white y shadow si está activo
+                                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${isSubActive
+                                                            ? 'text-white shadow-lg shadow-blue-900/20'
+                                                            : 'text-content-secondary hover:text-content-primary hover:bg-surface-primary/50'
+                                                            }`}
+                                                    >
+                                                        {/* EL GRADIENTE: Es vital para que se vea igual al principal */}
+                                                        {isSubActive && (
+                                                            <div className="absolute inset-0 bg-gradient-to-r from-brand-blue to-blue-600 opacity-100 -z-10 rounded-xl"></div>
+                                                        )}
+
+                                                        <SubIcon
+                                                            size={18}
+                                                            className={isSubActive ? 'text-white' : 'text-content-secondary group-hover:text-brand-orange transition-colors'}
+                                                        />
+                                                        <span className="text-sm font-medium tracking-wide">{subItem.label}</span>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        // --- OPCIÓN B: ES UN LINK SIMPLE (Tu código original) ---
                         return (
                             <Link
                                 key={item.path}
                                 to={item.path}
                                 onClick={() => setSidebarOpen(false)}
-                                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative overflow-hidden ${isActive
-                                    ? 'text-white shadow-lg shadow-blue-900/20'
-                                    : 'text-content-secondary hover:text-content-primary hover:bg-surface-primary/50'
+                                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative overflow-hidden ${isActive ? 'text-white shadow-lg shadow-blue-900/20' : 'text-content-secondary hover:text-content-primary hover:bg-surface-primary/50'
                                     }`}
                             >
                                 {isActive && (
@@ -114,9 +198,8 @@ const DashboardLayout = () => {
                                 )}
                                 <Icon size={20} className={isActive ? 'text-white' : 'text-content-secondary group-hover:text-brand-orange transition-colors'} />
                                 <span className="font-medium tracking-wide">{item.label}</span>
-                                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-orange shadow-[0_0_8px_var(--color-brand-orange)]"></div>}
                             </Link>
-                        )
+                        );
                     })}
                 </nav>
 

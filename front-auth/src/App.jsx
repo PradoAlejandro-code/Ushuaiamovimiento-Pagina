@@ -34,9 +34,9 @@ export default function App() {
 
         // Logic restored: sector.domain (e.g. barrio.ushuaiamovimiento.com.ar)
         if (isLocal) {
-            // Localhost mappings (Keeping these as simple fallbacks for now)
-            if (sector === 'jefe') return `http://localhost:5174?token=${token}`;
-            return `http://localhost:5175?token=${token}`;
+            // Localhost mappings
+            if (sector === 'jefe') return `http://localhost:5173?token=${token}`; // Assuming front-jefes runs on 5173 or 5174. User said 5173.
+            return `http://localhost:5174?token=${token}`; // Fallback for other sectors
         }
 
         // Production: dynamic subdomain

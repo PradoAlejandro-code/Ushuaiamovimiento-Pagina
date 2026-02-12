@@ -1,6 +1,6 @@
 import pandas as pd
 from django.db import transaction
-from .models import Contacto
+from contact.models import Contacto
 
 def importar_contactos_inteligente(archivo_csv, tag=None):
     """

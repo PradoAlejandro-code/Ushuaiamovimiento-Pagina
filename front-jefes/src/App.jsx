@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'; // <--- IMPORTANTE: useState
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import CreateSurveyPage from './pages/CreateSurveyPage';
-import SurveyManagerPage from './pages/SurveyManagerPage';
+import CreateReportPage from './pages/CreateReportPage';
+import SurveysPage from './pages/SurveysPage';
 import EditSurveyPage from './pages/EditSurveyPage';
 import ContactViewerPage from './pages/ContactViewerPage';
-import RespuestasDashboard from './pages/RespuestasDashboard';
+import SurveyResponsesPage from './pages/SurveyResponsesPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { useSessionExtender } from './hooks/useSessionExtender';
 
@@ -73,14 +74,16 @@ function App() {
                 }>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/create-survey" element={<CreateSurveyPage />} />
+                    <Route path="/create-report" element={<CreateReportPage />} />
 
                     {/* Rutas de Gestión */}
                     <Route path="/relevamiento" element={<EditSurveyPage isRelevamiento={true} />} />
-                    <Route path="/surveys" element={<SurveyManagerPage />} />
+                    <Route path="/relevamiento/responses" element={<SurveyResponsesPage isRelevamiento={true} />} />
+                    <Route path="/surveys" element={<SurveysPage />} />
                     <Route path="/surveys/edit/:id" element={<EditSurveyPage />} />
                     <Route path="/surveys/contacts/:id" element={<ContactViewerPage />} />
                     <Route path="/contacts" element={<ContactViewerPage />} />
-                    <Route path="/analytics" element={<RespuestasDashboard />} />
+                    <Route path="/surveys/responses/:id" element={<SurveyResponsesPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import RespuestaHeader, Contacto, RespuestaDetalle, Pregunta
+from .models import RespuestaHeader, RespuestaDetalle, Pregunta
+from contact.models import Contacto
 import re
 
 @receiver(post_save, sender=RespuestaHeader)
@@ -47,21 +48,29 @@ def procesar_header(header):
 
     # Solo si tenemos un celular (identificador unico) procesamos el contacto
     if tel_extraido:
-        defaults = {
-            'nombre': nombre_extraido if nombre_extraido else "Sin Nombre",
-        }
-        if email_extraido:
-            defaults['email'] = email_extraido
-        if dni_extraido:
-            defaults['dni'] = dni_extraido
-
-        # update_or_create busca por celular
-        contacto, created = Contacto.objects.update_or_create(
-            celular=tel_extraido,
-            defaults=defaults
-        )
+        # Truncar para asegurar que entra en el campo (max 20)
+        tel_extraido = tel_extraido[:20]
         
-        # Vinculamos al header si no estaba
-        if header.contacto != contacto:
-            header.contacto = contacto
-            header.save(update_fields=['contacto'])
+        try:
+            defaults = {
+                'nombre': nombre_extraido if nombre_extraido else "Sin Nombre",
+            }
+            if email_extraido:
+                defaults['email'] = email_extraido
+            if dni_extraido:
+                defaults['dni'] = dni_extraido
+
+            # update_or_create busca por celular
+            contacto, created = Contacto.objects.update_or_create(
+                celular=tel_extraido,
+                defaults=defaults
+            )
+            
+            # Vinculamos al header si no estaba
+            if header.contacto != contacto:
+                header.contacto = contacto
+                header.save(update_fields=['contacto'])
+        except Exception as e:
+            print(f"Error procesando contacto en signal: {e}")
+            # No re-lanzamos la excepción para no romper el guardado de la respuesta
+            pass

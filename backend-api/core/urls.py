@@ -17,6 +17,8 @@ urlpatterns = [
 
     # --- Tus Apps ---
     path('api/surveys/', include('surveys.urls')),
+    path('api/reports/', include('report.urls')),
+    path('api/contacts/', include('contact.urls')),
 ]
 
 # --- Configuración de Archivos Media (Imágenes) ---

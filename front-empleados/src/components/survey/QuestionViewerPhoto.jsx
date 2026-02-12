@@ -43,9 +43,10 @@ const QuestionViewerPhoto = ({ question, onChange, value, onProcessingStatus }) 
             setProcessingCount(selectedFiles.length);
 
             const options = {
-                maxSizeMB: 0.8,
-                maxWidthOrHeight: 1280,
-                useWebWorker: true
+                maxSizeMB: 0.6,
+                maxWidthOrHeight: 1024,
+                useWebWorker: true,
+                initialQuality: 0.7
             };
 
             try {
@@ -83,6 +84,13 @@ const QuestionViewerPhoto = ({ question, onChange, value, onProcessingStatus }) 
     const removeFile = (indexToRemove, e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Si la previsualización que vamos a borrar es un Blob, lo liberamos de memoria
+        const photoToRemove = previews[indexToRemove];
+        if (photoToRemove && typeof photoToRemove === 'string' && photoToRemove.startsWith('blob:')) {
+            URL.revokeObjectURL(photoToRemove);
+        }
+
         const updatedFiles = value.filter((_, idx) => idx !== indexToRemove);
         onChange(updatedFiles.length > 0 ? updatedFiles : null);
     };

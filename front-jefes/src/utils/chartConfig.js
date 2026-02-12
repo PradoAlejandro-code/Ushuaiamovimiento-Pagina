@@ -1,54 +1,40 @@
 import { Chart } from 'chart.js';
 import { Tooltip } from 'chart.js';
 
-// Configuración del Tooltip que sigue al mouse
+const imageCache = new Map();
+
 Tooltip.positioners.followMouse = function (elements, eventPosition) {
-    if (!elements.length) {
-        return false;
-    }
-    return {
-        x: eventPosition.x,
-        y: eventPosition.y
-    };
+    if (!elements.length) return false;
+    return { x: eventPosition.x, y: eventPosition.y };
 };
 
-// Helper para URLs de imágenes
 export const getAvatarUrl = (path) => {
     if (!path) return null;
     const API_BASE_URL = "https://api.ushuaiamovimiento.com.ar";
-    let finalUrl = path;
-    if (!path.startsWith('http')) {
-        finalUrl = `${API_BASE_URL}${path}`;
-    }
-    // Forzar HTTPS si es nuestro dominio para evitar Mixed Content
+    let finalUrl = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
     if (finalUrl.startsWith('http://api.ushuaiamovimiento.com.ar')) {
         return finalUrl.replace('http://', 'https://');
     }
     return finalUrl;
 };
 
-// Generador de Opciones Dinámico (Para adaptarse al Tema y Tipo de Gráfico)
 export const getChartOptions = (isDark, isUsersChart, isPie) => {
-    const textColor = isDark ? '#9CA3AF' : '#4B5563'; // gray-400 : gray-600
+    const textColor = isDark ? '#9CA3AF' : '#4B5563';
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
 
     return {
         responsive: true,
         maintainAspectRatio: false,
-        layout: {
-            padding: {
-                bottom: isUsersChart ? 40 : 0 // Espacio extra solo si hay avatares
-            }
-        },
+        layout: { padding: { bottom: isUsersChart ? 50 : 0 } },
         plugins: {
             legend: {
-                display: isPie, // Solo mostrar leyenda en gráficos de torta
+                display: isPie,
                 position: 'top',
                 labels: { color: textColor }
             },
             tooltip: {
                 position: 'followMouse',
-                yAlign: 'bottom', // El tooltip aparece arriba del cursor
+                yAlign: 'bottom',
                 backgroundColor: isDark ? '#1e293b' : '#ffffff',
                 titleColor: isDark ? '#f8fafc' : '#1e293b',
                 bodyColor: isDark ? '#cbd5e1' : '#475569',
@@ -60,7 +46,7 @@ export const getChartOptions = (isDark, isUsersChart, isPie) => {
                 boxPadding: 4
             }
         },
-        scales: isPie ? {} : { // Los gráficos de torta no tienen ejes X/Y
+        scales: isPie ? {} : {
             y: {
                 beginAtZero: true,
                 grid: { color: gridColor },
@@ -68,7 +54,6 @@ export const getChartOptions = (isDark, isUsersChart, isPie) => {
                 ticks: {
                     color: textColor,
                     font: { size: 11 },
-                    // CORRECCIÓN: Forzar números enteros
                     stepSize: 1,
                     precision: 0
                 }
@@ -77,7 +62,7 @@ export const getChartOptions = (isDark, isUsersChart, isPie) => {
                 grid: { display: false },
                 border: { display: false },
                 ticks: {
-                    display: !isUsersChart, // Ocultar etiquetas de texto si mostramos avatares
+                    display: !isUsersChart,
                     color: textColor
                 }
             }
@@ -85,18 +70,14 @@ export const getChartOptions = (isDark, isUsersChart, isPie) => {
     };
 };
 
-// Plugin para dibujar avatares en el eje X
 export const avatarAxisPlugin = {
     id: 'avatarAxis',
     afterDraw: (chart) => {
-        // Solo ejecutar si el dataset tiene la propiedad userImages
         const dataset = chart.data.datasets[0];
         if (!dataset.userImages || dataset.userImages.length === 0) return;
 
         const ctx = chart.ctx;
         const xAxis = chart.scales.x;
-
-        // Si no hay eje X (ej. Pie Chart), salir
         if (!xAxis) return;
 
         const imagesUrl = dataset.userImages;
@@ -105,40 +86,64 @@ export const avatarAxisPlugin = {
             const x = xAxis.getPixelForTick(index);
             const y = xAxis.bottom;
             const imageUrl = imagesUrl[index];
-            const size = 30; // Tamaño del avatar
+            const size = 50;
 
             if (imageUrl) {
-                const img = new Image();
-                img.src = imageUrl;
+                let img = imageCache.get(imageUrl);
 
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(x, y + 20, size / 2, 0, Math.PI * 2, true);
-                ctx.closePath();
-                ctx.clip();
+                if (!img) {
+                    img = new Image();
+                    img.src = imageUrl;
+                    img.onload = () => chart.draw();
+                    imageCache.set(imageUrl, img);
+                }
 
-                // Intento de dibujo seguro
-                try { ctx.drawImage(img, x - size / 2, y + 5, size, size); } catch (e) { }
+                if (img.complete && img.naturalWidth !== 0) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x, y + 25, size / 2, 0, Math.PI * 2, true);
+                    ctx.closePath();
+                    ctx.clip();
 
-                // Borde suave
-                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                    try {
+                        const imgRatio = img.width / img.height;
+                        let drawWidth, drawHeight, offsetX, offsetY;
 
-                ctx.restore();
+                        if (imgRatio > 1) {
+                            drawWidth = size * imgRatio;
+                            drawHeight = size;
+                            offsetX = x - drawWidth / 2;
+                            offsetY = y + 25 - size / 2;
+                        } else {
+                            drawWidth = size;
+                            drawHeight = size / imgRatio;
+                            offsetX = x - size / 2;
+                            offsetY = (y + 25) - (drawHeight / 2);
+                        }
+
+                        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                    } catch (e) { }
+
+                    ctx.restore();
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x, y + 25, size / 2, 0, Math.PI * 2, true);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.restore();
+                }
             } else {
-                // Fallback: Círculo con inicial
                 ctx.save();
-                ctx.fillStyle = '#cbd5e1'; // Slate-300
+                ctx.fillStyle = '#cbd5e1';
                 ctx.beginPath();
-                ctx.arc(x, y + 20, size / 2, 0, Math.PI * 2, true);
+                ctx.arc(x, y + 25, size / 2, 0, Math.PI * 2, true);
                 ctx.fill();
-
-                ctx.fillStyle = '#475569'; // Slate-600
-                ctx.font = 'bold 12px sans-serif';
+                ctx.fillStyle = '#475569';
+                ctx.font = 'bold 14px sans-serif';
                 ctx.textAlign = 'center';
                 const name = chart.data.labels[index] || "?";
-                ctx.fillText(name.charAt(0).toUpperCase(), x, y + 24);
+                ctx.fillText(name.charAt(0).toUpperCase(), x, y + 30);
                 ctx.restore();
             }
         });

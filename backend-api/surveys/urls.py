@@ -9,17 +9,13 @@ from .views import (
     PreguntaCreateView,
     EncuestaManagementListView,
     RecentResponseListView,
-    ContactosView,
-    ExportarContactosCSV,
     SurveyResponseListView,
     GlobalStatsView,
     ExportarEncuestaCompletaView,
     RelevamientoDetailView,
     RelevamientoDetailView,
-    RespuestaUpdateView,
-    ContactoListCreateView,
-    ContactoDetailView,
-    ContactoImportView
+    RelevamientoDetailView,
+    RespuestaUpdateView
 )
 
 urlpatterns = [
@@ -33,19 +29,7 @@ urlpatterns = [
     path('stats/global/', GlobalStatsView.as_view(), name='global-stats'),
     path('locations/', SeccionListView.as_view(), name='location-list'),
     path('responses/recent/', RecentResponseListView.as_view(), name='response-list-recent'),
-    
-    # Endpoints de Contactos
-    # Nuevos endpoints CRUD
-    path('contactos/', ContactoListCreateView.as_view(), name='contacto-list-create'),
-    path('contactos/importar/', ContactoImportView.as_view(), name='contacto-import'),
-    path('contactos/<int:pk>/', ContactoDetailView.as_view(), name='contacto-detail'),
 
-    # Endpoints Legacy (Visualización por Encuesta)
-    path('<int:encuesta_id>/contactos/', ContactosView.as_view(), name='survey-contacts'),
-    path('<int:encuesta_id>/exportar-csv/', ExportarContactosCSV.as_view(), name='survey-export-csv'),
-    # Globales
-    path('contactos/all/', ContactosView.as_view(), name='all-contacts'),
-    path('contactos/all/exportar-csv/', ExportarContactosCSV.as_view(), name='all-contacts-export'),
 
     # Exportación Completa (Zip)
     path('<int:pk>/exportar-completo/', ExportarEncuestaCompletaView.as_view(), name='encuesta-export-full'),

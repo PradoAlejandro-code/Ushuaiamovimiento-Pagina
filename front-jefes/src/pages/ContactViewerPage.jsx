@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getContactosDb, saveContacto, deleteContacto, importContactos, getSurvey } from "../api";
+import { getContacts, saveContact, deleteContact, importContacts, getSurvey } from "../api";
 import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User, Mail, CreditCard } from "lucide-react";
 import Card from '../components/ui/Card';
 import WhatsAppQRButton from '../components/ui/WhatsAppQRButton';
@@ -37,7 +37,7 @@ const ContactViewerPage = () => {
         setLoading(true);
         try {
             // Cargar datos de contactos (Centralizado)
-            const data = await getContactosDb();
+            const data = await getContacts();
             setContacts(data);
 
             // Si hay ID, solo cargamos el nombre de la encuesta para contexto, pero mostramos todos los contactos
@@ -77,7 +77,7 @@ const ContactViewerPage = () => {
     const handleDeleteClick = async (contactId) => {
         if (!window.confirm("¿Seguro que deseas eliminar este contacto?")) return;
         try {
-            await deleteContacto(contactId);
+            await deleteContact(contactId);
             setContacts(contacts.filter(c => c.id !== contactId));
         } catch (error) {
             console.error("Error deleting contact", error);
@@ -89,7 +89,7 @@ const ContactViewerPage = () => {
         e.preventDefault();
         setSaving(true);
         try {
-            const saved = await saveContacto(currentContact);
+            const saved = await saveContact(currentContact);
             if (currentContact.id) {
                 // Update list
                 setContacts(contacts.map(c => c.id === saved.id ? saved : c));
@@ -116,7 +116,7 @@ const ContactViewerPage = () => {
 
         try {
             // Enviamos el archivo directamente al backend
-            const result = await importContactos(importData, importTag);
+            const result = await importContacts(importData, importTag);
 
             alert(result.message); // El backend devuelve "message" con el resumen
 
@@ -291,7 +291,7 @@ const ContactViewerPage = () => {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-content-primary font-mono text-sm">{c.celular}</span>
                                                 <a
-                                                    href={`https://wa.me/${c.celular.replace(/\D/g, '')}`}
+                                                    href={`https://wa.me/${(c.celular || '').replace(/\D/g, '')}`}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 opacity-70 group-hover:opacity-100 transition-opacity"
