@@ -1,4 +1,5 @@
 from django.urls import path
+from metrics.views import GlobalStatsView
 from .views import (
     EncuestaCreateView, 
     EncuestaActiveListView, 
@@ -10,7 +11,6 @@ from .views import (
     EncuestaManagementListView,
     RecentResponseListView,
     SurveyResponseListView,
-    GlobalStatsView,
     ExportarEncuestaCompletaView,
     RelevamientoDetailView,
     RelevamientoDetailView,

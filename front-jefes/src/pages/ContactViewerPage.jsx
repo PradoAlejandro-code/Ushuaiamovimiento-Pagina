@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getContacts, saveContact, deleteContact, importContacts, getSurvey } from "../api";
+import { getSurvey } from "@/api/surveys";
+import { getContacts, saveContact, deleteContact, importContacts } from "@/api/contacts";
 import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User, Mail, CreditCard } from "lucide-react";
 import Card from '../components/ui/Card';
 import WhatsAppQRButton from '../components/ui/WhatsAppQRButton';

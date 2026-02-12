@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSurvey, getSurveyResponses, getRelevamiento, updateResponse, deleteResponse } from '../api';
+import { getSurvey, getSurveyResponses, getRelevamiento, updateResponse, deleteResponse } from '@/api/surveys';
 import {
     ArrowLeft, Loader, Download, FileText, User, Calendar,
     Eye, MapPin, X, Edit2, Trash2, Save

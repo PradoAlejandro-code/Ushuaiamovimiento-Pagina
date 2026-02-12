@@ -1,10 +1,10 @@
 import { Clock, MapPin, User } from "lucide-react";
 import { getAvatarUrl } from "../../utils/chartConfig";
-import Card from "./Card";
+import Card from "../ui/Card";
 
 const RecentActivity = ({ responses }) => {
     return (
-        <Card className="flex flex-col h-full !p-0 overflow-hidden border-border-base shadow-xl">
+        <Card className="flex flex-col h-full !p-0 overflow-hidden border-border-base">
             {/* Header */}
             <div className="p-6 border-b border-border-base bg-surface-primary/50">
                 <div className="flex items-center gap-2">
@@ -27,7 +27,7 @@ const RecentActivity = ({ responses }) => {
                                     {resp.usuario_foto ? (
                                         <img
                                             src={getAvatarUrl(resp.usuario_foto)}
-                                            className="w-12 h-12 rounded-full object-cover border-2 border-surface-primary shadow-sm"
+                                            className="w-12 h-12 rounded-full object-cover border-2 border-surface-primary"
                                         />
                                     ) : (
                                         <div className="w-12 h-12 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold">

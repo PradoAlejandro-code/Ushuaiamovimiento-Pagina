@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSurvey, getRelevamiento, getAllSurveys, createQuestion, deleteQuestion, updateQuestion, updateSurvey } from '../api';
+import { getSurvey, getRelevamiento, getAllSurveys, createQuestion, deleteQuestion, updateQuestion, updateSurvey } from '@/api/surveys';
 import MyButton from "../components/ui/MyButton";
 import QuestionBuilderText from "../components/survey/QuestionBuilderText";
 import QuestionBuilderNumber from "../components/survey/QuestionBuilderNumber";

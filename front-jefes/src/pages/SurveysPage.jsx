@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSurveys } from '../api';
+import { getAllSurveys } from '@/api/surveys';
 import { Loader, Settings2 } from 'lucide-react';
 import SurveyCard from '../components/survey/SurveyCard';
 

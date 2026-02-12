@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { extendSession } from '../api';
+import { extendSession } from '@/api/auth';
 
 export const useSessionExtender = () => {
     useEffect(() => {

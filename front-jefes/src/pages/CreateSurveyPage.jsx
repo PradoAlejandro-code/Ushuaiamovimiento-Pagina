@@ -14,7 +14,7 @@ import QuestionBuilderDni from "../components/survey/QuestionBuilderDni";
 import QuestionBuilderMail from "../components/survey/QuestionBuilderMail";
 
 import { Type, Hash, List, Camera, Save, Phone, User, Mail, CreditCard } from 'lucide-react';
-import { createSurvey } from '../api';
+import { createSurvey } from '@/api/surveys';
 
 const CreateSurveyPage = () => {
     const navigate = useNavigate();

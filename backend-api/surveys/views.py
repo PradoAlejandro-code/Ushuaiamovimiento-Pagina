@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
+from django.db.models import Count
+from django.db.models.functions import TruncDate, TruncMonth, TruncYear
 from .models import Encuesta, Pregunta, RespuestaHeader, RespuestaDetalle, Seccion, Barrio, RespuestaFoto
 
 User = get_user_model()
@@ -163,8 +165,7 @@ class RespuestaCreateView(APIView):
                 "traceback": tb 
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-from django.db.models import Count
-from django.db.models.functions import TruncDate, TruncMonth, TruncYear
+
 
 class RecentResponseListView(generics.ListAPIView):
     serializer_class = RecentResponseSerializer
@@ -270,65 +271,6 @@ class ExportarEncuestaCompletaView(APIView):
         response = HttpResponse(zip_buffer, content_type='application/zip')
         response['Content-Disposition'] = f'attachment; filename="Reporte_Completo_{encuesta.id}.zip"'
         return response
-
-class GlobalStatsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        period = request.query_params.get('period', 'day')
-        group_by = request.query_params.get('group_by', 'date')
-        if group_by:
-            group_by = group_by.strip().lower()
-        
-        qs = RespuestaHeader.objects.all()
-
-        if group_by == 'user':
-            from django.db.models import Count
-            stats = qs.values('usuario').annotate(count=Count('id')).order_by('-count')
-            
-            data = []
-            for item in stats:
-                uid = item['usuario']
-                try:
-                    user = User.objects.get(id=uid)
-                    if user.first_name or user.last_name:
-                        name = f"{user.first_name} {user.last_name}".strip()
-                    else:
-                        name = user.username or "Anónimo"
-                    
-                    picture_url = None
-                    if user.profile_picture:
-                        url = user.profile_picture.url
-                        picture_url = request.build_absolute_uri(url)
-                        if picture_url.startswith('http://api.ushuaiamovimiento.com.ar'):
-                            picture_url = picture_url.replace('http://', 'https://')
-
-                    data.append({
-                        "name": name,
-                        "value": item['count'],
-                        "image": picture_url
-                    })
-                except User.DoesNotExist:
-                    continue
-        else:
-            if period == 'year':
-                trunc_func = TruncYear('fecha_envio')
-            elif period == 'month':
-                trunc_func = TruncMonth('fecha_envio')
-            else:
-                trunc_func = TruncDate('fecha_envio')
-
-            stats = qs.annotate(date=trunc_func).values('date').annotate(count=Count('id')).order_by('date')
-            
-            data = [
-                {
-                    "name": item['date'].strftime('%Y-%m-%d') if period == 'day' else (item['date'].strftime('%Y-%m') if period == 'month' else item['date'].strftime('%Y')),
-                    "value": item['count']
-                }
-                for item in stats
-            ]
-        
-        return Response(data)
 
 
 class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):

@@ -1,116 +1,185 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
     Tooltip,
-    Legend,
-    ArcElement
-} from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
-import { PieChart as PieIcon, BarChart as BarIcon } from 'lucide-react';
-import Card from '../ui/Card';
-import { avatarAxisPlugin, getChartOptions, getAvatarUrl } from '../../utils/chartConfig';
+    ResponsiveContainer,
+    Cell,
+    PieChart,
+    Pie
+} from 'recharts';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+// --- 1. TOOLTIP ---
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            // CSS Transform: Lo sube y lo centra. 
+            // 'pointer-events-none' evita que el mouse choque con el cartel.
+            <div className="bg-surface-secondary/95 backdrop-blur-md border border-border-base px-3 py-2 rounded-lg shadow-xl transform -translate-y-[120%] -translate-x-[50%] pointer-events-none whitespace-nowrap z-50">
+                <p className="text-[10px] font-bold text-content-secondary uppercase mb-0.5">{label}</p>
+                <p className="text-sm font-black text-brand-blue leading-none">
+                    {payload[0].value} Respuestas
+                </p>
+            </div>
+        );
+    }
+    return null;
+};
 
-export default function ChartCard({ dataPregunta, className = "" }) {
-    const [tipoGrafico, setTipoGrafico] = useState('bar');
-    const [isDark, setIsDark] = useState(false);
+// --- 2. EJE X CON AVATARES ---
+const CustomTick = ({ x, y, payload, data }) => {
+    const dataItem = data && data[payload.index];
+    const size = 60;
+    const xPos = x - (size / 2);
+    const yPos = y + 5;
 
-    useEffect(() => {
-        const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'));
-        checkTheme();
-        const observer = new MutationObserver(checkTheme);
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        return () => observer.disconnect();
-    }, []);
-
-    if (!dataPregunta || !dataPregunta.data || dataPregunta.data.length === 0) {
-        return null;
+    if (dataItem && dataItem.image) {
+        return (
+            <g transform={`translate(${xPos},${yPos})`}>
+                <foreignObject width={size} height={size}>
+                    <img
+                        src={dataItem.image}
+                        alt=""
+                        className="w-full h-full rounded-full object-cover border-2 border-surface-primary shadow-md hover:scale-110 transition-transform duration-200"
+                    />
+                </foreignObject>
+            </g>
+        );
     }
 
-    const isUsersChart = dataPregunta.extraType === 'users' || dataPregunta.id === 'users_participation';
-    const currentType = isUsersChart ? 'bar' : tipoGrafico;
-    const labels = dataPregunta.data.map(item => item.name);
-    const valores = dataPregunta.data.map(item => item.value);
-    const imagenes = isUsersChart ? dataPregunta.data.map(item => getAvatarUrl(item.image)) : [];
+    return (
+        <g transform={`translate(${x},${y + 20})`}>
+            <text x={0} y={0} dy={0} textAnchor="middle" fill="#9ca3af" className="text-[10px] font-bold uppercase">
+                {payload.value.substring(0, 3)}
+            </text>
+        </g>
+    );
+};
 
-    const backgroundColors = isUsersChart ? '#f97316' : [
-        'rgba(59, 130, 246, 0.7)',
-        'rgba(16, 185, 129, 0.7)',
-        'rgba(245, 158, 11, 0.7)',
-        'rgba(239, 68, 68, 0.7)',
-        'rgba(139, 92, 246, 0.7)',
-    ];
+const ChartCard = ({ dataPregunta, className, action }) => {
+    const [isPie, setIsPie] = useState(false);
+    const [chartData, setChartData] = useState([]);
 
-    const borderColors = isUsersChart ? '#f97316' : [
-        'rgba(59, 130, 246, 1)',
-        'rgba(16, 185, 129, 1)',
-        'rgba(245, 158, 11, 1)',
-        'rgba(239, 68, 68, 1)',
-        'rgba(139, 92, 246, 1)',
-    ];
+    useEffect(() => {
+        if (!dataPregunta || !dataPregunta.data) return;
 
-    const dataConfig = {
-        labels: labels,
-        datasets: [
-            {
-                label: 'Respuestas',
-                data: valores,
-                backgroundColor: backgroundColors,
-                borderColor: borderColors,
-                borderWidth: isUsersChart ? 2 : 1,
-                borderRadius: isUsersChart ? 4 : 0,
-                maxBarThickness: isUsersChart ? 60 : 50,
-                userImages: imagenes,
-            },
-        ],
-    };
+        const formattedData = dataPregunta.data.map(d => ({
+            name: d.name || d.label,
+            value: d.value,
+            image: d.image || null
+        }));
+        setChartData(formattedData);
+    }, [dataPregunta]);
 
-    const baseOptions = getChartOptions(isDark, isUsersChart, currentType === 'pie');
-    const finalOptions = {
-        ...baseOptions,
-        maintainAspectRatio: false,
-    };
+    const isUsersChart = dataPregunta.extraType === 'users';
+    const BAR_COLOR_USER = '#f97316';
+    const BAR_COLOR_DEFAULT = '#3b82f6';
+    const PIE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+    if (!chartData.length) return null;
 
     return (
-        <Card className={`flex flex-col h-full mb-0 ${className}`}>
-            <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-2">
-                    {isUsersChart && <span className="w-1.5 h-5 bg-brand-orange rounded-full"></span>}
-                    <h3 className="text-lg font-bold text-content-primary leading-tight">
+        <div className={`p-6 bg-surface-primary rounded-2xl border border-border-base flex flex-col ${className}`}>
+
+            {/* ENCABEZADO */}
+            <div className="flex items-center justify-between mb-2 gap-4 h-10">
+                <div className="flex items-center gap-2 overflow-hidden">
+                    {isUsersChart && <span className="w-1.5 h-6 bg-brand-orange rounded-full flex-shrink-0"></span>}
+                    <h3 className="text-lg font-bold text-content-primary leading-tight truncate">
                         {dataPregunta.titulo}
                     </h3>
                 </div>
 
-                {!isUsersChart && (
-                    <div className="flex bg-surface-secondary rounded-lg p-1 shrink-0 border border-border-base">
-                        <button
-                            onClick={() => setTipoGrafico('bar')}
-                            className={`p-1.5 rounded transition-colors ${currentType === 'bar' ? 'bg-surface-primary shadow-sm text-brand-blue' : 'text-content-secondary hover:text-content-primary'}`}
-                        >
-                            <BarIcon size={18} />
-                        </button>
-                        <button
-                            onClick={() => setTipoGrafico('pie')}
-                            className={`p-1.5 rounded transition-colors ${currentType === 'pie' ? 'bg-surface-primary shadow-sm text-brand-blue' : 'text-content-secondary hover:text-content-primary'}`}
-                        >
-                            <PieIcon size={18} />
-                        </button>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0 relative z-20">
+                    {action && <div>{action}</div>}
+                    {!isUsersChart && !action && (
+                        <div className="flex bg-surface-secondary rounded-lg p-0.5 border border-border-base">
+                            <button onClick={() => setIsPie(false)} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${!isPie ? 'bg-white dark:bg-slate-700 text-brand-blue shadow-sm' : 'text-content-secondary hover:text-content-primary'}`}>BAR</button>
+                            <button onClick={() => setIsPie(true)} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${isPie ? 'bg-white dark:bg-slate-700 text-brand-blue shadow-sm' : 'text-content-secondary hover:text-content-primary'}`}>PIE</button>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="flex-1 w-full relative min-h-0">
-                {currentType === 'bar' ? (
-                    <Bar options={finalOptions} data={dataConfig} plugins={[avatarAxisPlugin]} />
-                ) : (
-                    <Pie options={finalOptions} data={dataConfig} />
-                )}
+            {/* GRÁFICO */}
+            <div className="flex-1 w-full min-h-[300px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                    {isPie && !isUsersChart ? (
+                        <PieChart>
+                            <Pie
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                content={<CustomTooltip />}
+                                cursor={false}
+                                isAnimationActive={false}
+                                wrapperStyle={{ outline: 'none' }}
+                                allowEscapeViewBox={{ x: true, y: true }} // <--- ESTO ARREGLA EL BUG
+                            />
+                        </PieChart>
+                    ) : (
+                        <BarChart
+                            data={chartData}
+                            margin={{ top: 20, right: 0, left: -25, bottom: isUsersChart ? 5 : 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156, 163, 175, 0.1)" />
+
+                            <XAxis
+                                dataKey="name"
+                                axisLine={false}
+                                tickLine={false}
+                                interval={0}
+                                tick={isUsersChart ? <CustomTick data={chartData} /> : { fontSize: 10, fill: '#9ca3af' }}
+                                height={isUsersChart ? 70 : 30}
+                            />
+
+                            <YAxis
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 10, fill: '#9ca3af' }}
+                            />
+
+                            <Tooltip
+                                content={<CustomTooltip />}
+                                cursor={false}
+                                isAnimationActive={false} // Sin delay
+                                animationDuration={0}     // Sin animación
+                                allowEscapeViewBox={{ x: true, y: true }} // <--- CRÍTICO: Evita el salto al bajar el mouse
+                            />
+
+                            <Bar
+                                dataKey="value"
+                                radius={[6, 6, 0, 0]}
+                                maxBarSize={50}
+                                animationDuration={800}
+                                animationBegin={0}
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={isUsersChart ? BAR_COLOR_USER : BAR_COLOR_DEFAULT}
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    )}
+                </ResponsiveContainer>
             </div>
-        </Card>
+        </div>
     );
-} 1
+};
+
+export default ChartCard;
