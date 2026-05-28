@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Home as HomeIcon, Folder, Gift, MoreHorizontal, Sun, Moon, LogOut } from 'lucide-react';
-import { getCurrentUser, API_URL } from '../../api';
+import { API_URL } from '../../api';
+import { useCurrentUser } from '../../queries/useUser';
+import { useBirthdaysList } from '../../queries/useBirthdays';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 
 const MainLayout = () => {
     const { theme, setTheme } = useTheme();
     const location = useLocation();
     
-    const [currentUser, setCurrentUser] = useState(null);
     const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
     // Sync Theme Cookie
@@ -20,17 +21,21 @@ const MainLayout = () => {
     }, [theme]);
 
     // Fetch User Profile
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const userData = await getCurrentUser();
-                setCurrentUser(userData);
-            } catch (err) {
-                console.error("Error fetching user profile:", err);
-            }
-        };
-        fetchUser();
-    }, []);
+    const { data: currentUser } = useCurrentUser();
+
+    // Check Assigned and Undelivered Birthdays (refetches every 60s)
+    const { data: birthdaysData } = useBirthdaysList('today', {
+        refetchInterval: 60000,
+        enabled: !!currentUser
+    });
+
+    const birthdaysList = birthdaysData?.results || birthdaysData || [];
+    const hasAssignedBirthdays = currentUser ? birthdaysList.some(person => {
+        const assignment = person.asignacion_actual;
+        const isAssignedToMe = assignment && Number(assignment.empleado_id) === Number(currentUser.id);
+        const isNotDelivered = assignment && !assignment.entregado;
+        return isAssignedToMe && isNotDelivered;
+    }) : false;
 
     const logout = () => {
         localStorage.removeItem('access_token');
@@ -122,11 +127,27 @@ const MainLayout = () => {
                     <Link
                         to="/cumpleanos"
                         className={`flex flex-col items-center justify-center h-full gap-1 transition-all duration-200 cursor-pointer ${
-                            currentView === 'cumpleanos' ? 'text-brand-blue scale-105' : 'text-content-secondary hover:text-content-primary'
+                            currentView === 'cumpleanos' 
+                                ? (hasAssignedBirthdays ? 'scale-105' : 'text-brand-blue scale-105')
+                                : (hasAssignedBirthdays ? '' : 'text-content-secondary hover:text-content-primary')
                         }`}
                     >
-                        <Gift size={24} strokeWidth={currentView === 'cumpleanos' ? 2.5 : 2} />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Cumples</span>
+                        <div className="relative flex flex-col items-center justify-center">
+                            <Gift 
+                                size={24} 
+                                strokeWidth={currentView === 'cumpleanos' ? 2.5 : 2} 
+                                className={hasAssignedBirthdays ? "animate-purple-glow" : ""}
+                            />
+                            {hasAssignedBirthdays && (
+                                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                                </span>
+                            )}
+                        </div>
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${hasAssignedBirthdays ? "animate-purple-text" : ""}`}>
+                            Cumples
+                        </span>
                     </Link>
 
                     {/* Item 5: Más (Disabled) */}

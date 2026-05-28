@@ -1,34 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { getBirthdays, deliverBirthday } from '../../api';
-import Card from '../ui/Card';
+import React, { useState } from 'react';
+import { useBirthdaysList, useDeliverBirthday } from '../../queries/useBirthdays';
+import Card from '../ui/CustomCard';
 import { Cake, Gift, Phone, MapPin, CreditCard, ChevronDown, ChevronUp, User, ShieldCheck, ShieldAlert, Check, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const BirthdayList = ({ currentUser }) => {
-    const [birthdays, setBirthdays] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
     const [deliveringIds, setDeliveringIds] = useState(new Set());
+    const [localDeliveredIds, setLocalDeliveredIds] = useState(new Set());
     const [selectedPersonForDelivery, setSelectedPersonForDelivery] = useState(null);
     const [observationText, setObservationText] = useState('');
 
-    useEffect(() => {
-        const fetchBirthdays = async () => {
-            setLoading(true);
-            try {
-                // Obtenemos únicamente los cumpleaños de "hoy"
-                const data = await getBirthdays('today');
-                const list = data.results || data || [];
-                setBirthdays(list);
-            } catch (error) {
-                console.error("Error fetching birthdays:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    // Fetch Birthdays using React Query
+    const { data: birthdaysData, isLoading: loading } = useBirthdaysList('today');
+    const birthdays = birthdaysData?.results || birthdaysData || [];
 
-        fetchBirthdays();
-    }, []);
+    // Deliver Mutation
+    const { mutateAsync: sendDelivery } = useDeliverBirthday();
 
     const toggleExpand = (id) => {
         setExpandedId(expandedId === id ? null : id);
@@ -42,21 +30,14 @@ const BirthdayList = ({ currentUser }) => {
         });
 
         try {
-            await deliverBirthday(personId, observacion);
+            await sendDelivery({ personId, observacion });
             
             // Marcamos como entregado localmente para disparar la animación de salida
-            setBirthdays(prev => prev.map(p => {
-                if (p.id === personId) {
-                    return {
-                        ...p,
-                        asignacion_actual: {
-                            ...p.asignacion_actual,
-                            entregado: true
-                        }
-                    };
-                }
-                return p;
-            }));
+            setLocalDeliveredIds(prev => {
+                const next = new Set(prev);
+                next.add(personId);
+                return next;
+            });
         } catch (err) {
             console.error("Error marking birthday as delivered:", err);
             alert("No se pudo marcar como entregado. Inténtalo de nuevo.");
@@ -80,7 +61,7 @@ const BirthdayList = ({ currentUser }) => {
     const assignedToMeAndNotDelivered = birthdays.filter(person => {
         const assignment = person.asignacion_actual;
         const isAssignedToMe = assignment && currentUser && Number(assignment.empleado_id) === Number(currentUser.id);
-        const isNotDelivered = assignment && !assignment.entregado;
+        const isNotDelivered = assignment && !assignment.entregado && !localDeliveredIds.has(person.id);
         return isAssignedToMe && isNotDelivered;
     });
 

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import MyButton from '../components/ui/MyButton';
 import { ClipboardList, MapPin, UploadCloud } from 'lucide-react';
-import { getActiveSurveys, getRelevamiento } from '../api';
-import Card from '../components/ui/Card';
+import { useActiveSurveys, useRelevamientoDetail } from '../queries/useSurveys';
+import Card from '../components/ui/CustomCard';
 import SurveyViewer from './SurveyViewer';
 import ImportSurvey from '../components/survey/ImportSurvey';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,39 +13,21 @@ const Home = () => {
     // ESTADO DE SUB-TABS (Inicio Toolbar: 'relevamientos' | 'encuestas' | 'importar')
     const [subTab, setSubTab] = useState('relevamientos');
 
-    // Data & Loading
-    const [surveys, setSurveys] = useState([]);
-    const [loading, setLoading] = useState(true);
-
     // Get currentUser context from Layout
     const { currentUser } = useOutletContext(); 
     
+    // Fetch Surveys and Relevamientos Data using React Query
+    const { data: surveysData, isLoading: isLoadingSurveys } = useActiveSurveys();
+    const { data: relevamiento, isLoading: isLoadingRelevamiento } = useRelevamientoDetail();
+
+    const rawData = surveysData?.results || surveysData;
+    const surveys = Array.isArray(rawData) ? rawData : [];
+    const loading = isLoadingSurveys || isLoadingRelevamiento;
+
     // Derived State
-    const [relevamiento, setRelevamiento] = useState(null);
     const encuestas = surveys.filter(s => s.es_relevamiento === false);
     const rawRole = currentUser?.role || '';
     const isAdmin = rawRole && ['admin', 'administrador'].includes(String(rawRole).toLowerCase());
-
-    // Fetch Surveys and Relevamientos Data
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [surveysData, relevamientoData] = await Promise.all([
-                    getActiveSurveys(),
-                    getRelevamiento().catch(() => null)
-                ]);
-                const rawData = surveysData.results || surveysData;
-                setSurveys(Array.isArray(rawData) ? rawData : []);
-                setRelevamiento(relevamientoData);
-            } catch (error) {
-                console.error("Error loading surveys:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, []);
 
     return (
         <AnimatePresence mode="wait">

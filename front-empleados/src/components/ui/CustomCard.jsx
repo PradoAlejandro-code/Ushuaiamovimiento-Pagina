@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Card = ({ children, className = '', onClick }) => {
+const CustomCard = ({ children, className = '', onClick }) => {
     return (
         <div
             onClick={onClick}
@@ -11,4 +11,4 @@ const Card = ({ children, className = '', onClick }) => {
     );
 };
 
-export default Card;
+export default CustomCard;

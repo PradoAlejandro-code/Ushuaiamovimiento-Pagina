@@ -65,7 +65,7 @@ const CustomTick = ({ x, y, payload, data, isParticipation }) => {
     );
 };
 
-const SurveyStatsDashboard = ({ statsData = [], isLoading = false }) => {
+const SurveyStatsDashboard = ({ statsData = [], isLoading = false, className = '' }) => {
     const [selectedId, setSelectedId] = useState('participation');
     const [viewType, setViewType] = useState(null);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -85,8 +85,8 @@ const SurveyStatsDashboard = ({ statsData = [], isLoading = false }) => {
 
     if (isLoading) {
         return (
-            <Card className="!p-0 border-border-base bg-surface-primary shadow-xl rounded-2xl overflow-hidden animate-pulse">
-                <div className="flex flex-col md:flex-row h-full min-h-[550px]">
+            <Card className={`!p-0 border-border-base bg-surface-primary shadow-xl rounded-2xl overflow-hidden animate-pulse flex flex-col ${className}`}>
+                <div className="flex flex-col md:flex-row flex-1 min-h-[550px] md:min-h-0 w-full">
                     <div className="w-full md:w-1/3 border-r border-border-base bg-surface-secondary/30 p-4">
                         <div className="h-4 w-24 bg-surface-secondary rounded mb-4"></div>
                         {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-surface-secondary rounded mb-2"></div>)}
@@ -98,8 +98,8 @@ const SurveyStatsDashboard = ({ statsData = [], isLoading = false }) => {
     }
 
     return (
-        <Card className="!p-0 border-border-base bg-surface-primary shadow-xl rounded-2xl overflow-hidden">
-            <div className="flex flex-col md:flex-row h-full min-h-[550px]">
+        <Card className={`!p-0 border-border-base bg-surface-primary shadow-xl rounded-2xl overflow-hidden flex flex-col ${className}`}>
+            <div className="flex flex-col md:flex-row flex-1 min-h-[550px] md:min-h-0 w-full">
 
                 {/* --- MÓVIL: SELECTOR --- */}
                 <div className="md:hidden p-4 border-b border-border-base bg-surface-secondary/20">
@@ -129,13 +129,13 @@ const SurveyStatsDashboard = ({ statsData = [], isLoading = false }) => {
                 </div>
 
                 {/* --- ESCRITORIO: LISTA --- */}
-                <div className="hidden md:block w-1/3 border-r border-border-base bg-surface-secondary/30">
-                    <div className="p-4 border-b border-border-base bg-surface-secondary/50">
+                <div className="hidden md:flex flex-col w-1/3 border-r border-border-base bg-surface-secondary/30">
+                    <div className="p-4 border-b border-border-base bg-surface-secondary/50 shrink-0">
                         <h3 className="text-[10px] font-black text-content-secondary uppercase tracking-[0.2em]">Analítica</h3>
                     </div>
-                    <div className="overflow-y-auto max-h-[480px] custom-scrollbar">
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
                         {statsData.map((stat) => (
-                            <button key={stat.id} onClick={() => { setSelectedId(stat.id); setViewType(null); }} className={`w-full flex items-center justify-between p-4 text-left border-b border-border-base/50 ${selectedId === stat.id ? 'bg-surface-primary border-l-4 border-brand-blue shadow-inner' : 'hover:bg-surface-primary/20 border-l-4 border-transparent'}`}>
+                            <button key={stat.id} onClick={() => { setSelectedId(stat.id); }} className={`w-full flex items-center justify-between p-4 text-left border-b border-border-base/50 ${selectedId === stat.id ? 'bg-surface-primary border-l-4 border-brand-blue shadow-inner' : 'hover:bg-surface-primary/20 border-l-4 border-transparent'}`}>
                                 <div className="flex items-center gap-3 min-w-0">
                                     <BarChart3 size={16} className={selectedId === stat.id ? 'text-brand-blue' : 'text-content-secondary'} />
                                     <div className="min-w-0">

@@ -14,6 +14,8 @@ import BirthdaysPage from './pages/BirthdaysPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { useSessionExtender } from './hooks/useSessionExtender';
 import ScrollToTop from './components/ui/ScrollToTop';
+import RespuestasDemoPage from './pages/RespuestasDemoPage';
+import AgendaDemoPage from './pages/AgendaDemoPage';
 
 // Componente que protege la ruta
 const ProtectedRoute = ({ children }) => {
@@ -94,6 +96,8 @@ function App() {
                     <Route path="/enrollments" element={<EnrollmentsPage />} />
                     <Route path="/neighbors" element={<NeighborsPage />} />
                     <Route path="/birthdays" element={<BirthdaysPage />} />
+                    <Route path="/respuestas-demo" element={<RespuestasDemoPage />} />
+                    <Route path="/agenda-demo" element={<AgendaDemoPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -171,7 +171,7 @@ const CreateSurveyPage = () => {
         fecha: { css: { border: 'border-brand-blue' } },
         dni: { css: { border: 'border-cyan-600' } },
         mail: { css: { border: 'border-yellow-500' } },
-        nombre: { css: { border: 'border-blue-500' } },
+        nombre: { css: { border: 'border-brand-blue' } },
         numero: { css: { border: 'border-emerald-500' } },
         opciones: { css: { border: 'border-purple-500' } },
         foto: { css: { border: 'border-brand-orange' } }
@@ -184,7 +184,7 @@ const CreateSurveyPage = () => {
     };
 
     return (
-        <div className="w-full px-4 md:px-8 pb-48">
+        <div className="w-full pb-48">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">

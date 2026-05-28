@@ -1,26 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { getResponseDetail } from '../../api';
-import Card from '../ui/Card';
+import React, { useState } from 'react';
+import { useResponseDetail } from '../../queries/useResponses';
+import Card from '../ui/CustomCard';
 import { ArrowLeft, Calendar, MapPin, Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MyResponseDetail = ({ responseId, onBack }) => {
-    const [respuesta, setRespuesta] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [gallery, setGallery] = useState({ isOpen: false, images: [], currentIndex: 0 });
 
-    useEffect(() => {
-        const fetchDetail = async () => {
-            try {
-                const data = await getResponseDetail(responseId);
-                setRespuesta(data);
-            } catch (error) {
-                console.error("Error fetching detail", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDetail();
-    }, [responseId]);
+    // Fetch Response Detail with React Query
+    const { data: respuesta, isLoading: loading } = useResponseDetail(responseId);
 
     const openGallery = (images, index) => setGallery({ isOpen: true, images, currentIndex: index });
     const closeGallery = () => setGallery({ ...gallery, isOpen: false });

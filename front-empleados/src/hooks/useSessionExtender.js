@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
-import { extendSession } from '../api';
+import { useExtendSessionMutation } from '../queries/useAuth';
 
 export const useSessionExtender = () => {
+    const { mutate: pingServer } = useExtendSessionMutation();
+
     useEffect(() => {
         let lastActivity = Date.now();
 
@@ -41,16 +43,17 @@ export const useSessionExtender = () => {
             const now = Date.now();
             if (now - lastActivity < PING_INTERVAL) {
                 // Solo extendemos si el usuario está activo recientemente
-                extendSession().catch(() => { });
+                pingServer();
             }
         }, PING_INTERVAL);
 
         return () => {
             clearInterval(interval);
+            clearInterval(pingInterval);
             window.removeEventListener('mousemove', handleActivity);
             window.removeEventListener('keypress', handleActivity);
             window.removeEventListener('scroll', handleActivity);
             window.removeEventListener('click', handleActivity);
         };
-    }, []);
+    }, [pingServer]);
 };

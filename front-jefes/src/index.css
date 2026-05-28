@@ -87,6 +87,11 @@
         transition: background-color 150ms ease-in-out !important;
     }
 
+    body[data-scroll-locked] {
+        padding-right: 0 !important;
+        margin-right: 0 !important;
+    }
+
     /* Animamos solo elementos que el usuario toca, para que la UI se sienta viva */
     button,
     a,

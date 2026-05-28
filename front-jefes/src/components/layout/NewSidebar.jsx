@@ -5,7 +5,7 @@ import {
     Home, PlusCircle, LogOut, Phone, MapPinned, MapPinPlus,
     MessagesSquare, ListChecks, FileSearch, FileBarChart,
     FilePlus2, Eye, ChevronDown, Users, Sun, Moon, Menu, User, UserSquare2,
-    Gift
+    Gift, LayoutGrid
 } from 'lucide-react';
 import { getAvatarUrl } from '@/utils/chartConfig';
 import { useProfile } from '@/queries/useAuth';
@@ -108,10 +108,19 @@ const NewSidebar = ({ handleLogout, theme, setTheme }) => {
                 { path: '/reports', label: 'Ver todos', icon: Eye },
             ]
         },
-        { path: '/contacts', label: 'Contactos', icon: Phone },
-        { path: '/Enrollments', label: 'Padrones', icon: Users },
-        { path: '/neighbors', label: 'Vecinos', icon: UserSquare2 },
-        { path: '/birthdays', label: 'Cumpleaños', icon: Gift },
+        { path: '/contacts', label: 'Agenda de Seguimiento', icon: Phone },
+        {
+            label: 'Ciudadanos',
+            icon: Users,
+            isDropdown: true,
+            items: [
+                { path: '/neighbors', label: 'Vecinos', icon: UserSquare2 },
+                { path: '/Enrollments', label: 'Padrones', icon: Users },
+                { path: '/birthdays', label: 'Cumpleaños', icon: Gift },
+            ]
+        },
+        { path: '/respuestas-demo', label: 'Respuestas Demo', icon: LayoutGrid },
+        { path: '/agenda-demo', label: 'Agenda Demo', icon: LayoutGrid },
     ];
 
     useEffect(() => {

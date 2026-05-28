@@ -35,8 +35,20 @@ export default function App() {
 
         // Logic restored: sector.domain (e.g. barrio.ushuaiamovimiento.com.ar)
         if (isLocal) {
-            // Localhost mappings
-            return `http://localhost:5174?token=${token}`; // Fallback for other sectors
+            // Normalize sector name (lowercase, trim, remove accents/diacritics)
+            const sectorClean = String(sector)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim();
+
+            // Employee and surveyor sectors run on port 5174
+            if (sectorClean === 'empleado' || sectorClean === 'empleados' || sectorClean === 'encuestador' || sectorClean === 'encuestadores') {
+                return `http://localhost:5174?token=${token}`;
+            }
+
+            // All management/admin/boss sectors (jefe, jefes, administracion, admin, etc.) run on port 5175
+            return `http://localhost:5175?token=${token}`;
         }
 
         // Production: dynamic subdomain

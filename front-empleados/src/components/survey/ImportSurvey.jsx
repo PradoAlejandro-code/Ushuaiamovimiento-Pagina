@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { getSurvey, submitSurvey, getLocations, getUsers } from '../../api';
+import { useSurveyDetail, useSubmitSurvey } from '../../queries/useSurveys';
+import { useLocationsList } from '../../queries/useLocations';
+import { useAllUsers } from '../../queries/useUser';
 import MyButton from '../ui/MyButton';
-import Card from '../ui/Card';
+import Card from '../ui/CustomCard';
 import { UploadCloud, CheckCircle, AlertCircle, Loader, ArrowRight, Eye, Play } from 'lucide-react';
 
 const ImportSurvey = ({ surveys, relevamiento }) => {
@@ -11,9 +13,19 @@ const ImportSurvey = ({ surveys, relevamiento }) => {
     if (surveys) allSurveys.push(...surveys.filter(s => !s.es_relevamiento));
 
     const [selectedSurveyId, setSelectedSurveyId] = useState("");
-    const [surveyMapData, setSurveyMapData] = useState(null);
-    const [locations, setLocations] = useState([]);
-    const [users, setUsers] = useState([]);
+
+    // Fetch Survey Detail
+    const { data: surveyMapData, isLoading: loadingSurvey } = useSurveyDetail(selectedSurveyId);
+
+    // Fetch Locations (only if the survey requires it and we have a survey loaded)
+    const { data: locationsData } = useLocationsList(!!surveyMapData?.requiere_ubicacion);
+    const locations = locationsData?.results || locationsData || [];
+
+    // Fetch Users (only if manual surveyor is activated)
+    const { data: usersData } = useAllUsers(!!surveyMapData?.activar_encuestador_manual);
+    const users = usersData?.results || usersData || [];
+
+    const submitMutation = useSubmitSurvey();
 
     const [fileData, setFileData] = useState(null);
     const [headers, setHeaders] = useState([]);
@@ -31,30 +43,8 @@ const ImportSurvey = ({ surveys, relevamiento }) => {
 
     useEffect(() => {
         if (!selectedSurveyId) {
-            setSurveyMapData(null);
             setStep(1);
-            return;
         }
-
-        const fetchDetails = async () => {
-            try {
-                const sData = await getSurvey(selectedSurveyId);
-                setSurveyMapData(sData);
-
-                if (sData.requiere_ubicacion) {
-                    const locs = await getLocations();
-                    setLocations(locs.results || locs || []);
-                }
-                if (sData.activar_encuestador_manual) {
-                    const usrs = await getUsers();
-                    setUsers(usrs.results || usrs || []);
-                }
-            } catch (err) {
-                console.error("Error loading survey details", err);
-                alert("Error al cargar la encuesta seleccionada.");
-            }
-        };
-        fetchDetails();
     }, [selectedSurveyId]);
 
     const handleFileUpload = (e) => {
@@ -205,7 +195,7 @@ const ImportSurvey = ({ surveys, relevamiento }) => {
                 }
             }
 
-            await submitSurvey(surveyMapData.id, jsonData);
+            await submitMutation.mutateAsync({ id: surveyMapData.id, payload: jsonData });
 
             updateRow(rowIndex, 'status', 'success');
             updateRow(rowIndex, 'errorMsg', null);
@@ -249,8 +239,15 @@ const ImportSurvey = ({ surveys, relevamiento }) => {
                         </select>
                     </div>
 
+                    {loadingSurvey && (
+                        <div className="flex items-center gap-2 text-xs text-content-secondary py-2 font-bold uppercase tracking-wider animate-pulse">
+                            <Loader className="animate-spin text-brand-blue" size={14} />
+                            <span>Cargando detalles de la encuesta...</span>
+                        </div>
+                    )}
+
                     {/* 2. Cargar Archivo */}
-                    {surveyMapData && (
+                    {surveyMapData && !loadingSurvey && (
                         <div>
                             <label className="block text-xs font-semibold text-content-secondary uppercase mb-1">Cargar Archivo Excel (.xlsx)</label>
                             <input

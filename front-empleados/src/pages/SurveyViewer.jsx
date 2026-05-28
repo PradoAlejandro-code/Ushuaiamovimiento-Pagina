@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MyButton from '../components/ui/MyButton';
 import QuestionViewerText from '../components/survey/QuestionViewerText';
@@ -7,8 +7,10 @@ import QuestionViewerOptions from '../components/survey/QuestionViewerOptions';
 import QuestionViewerPhoto from '../components/survey/QuestionViewerPhoto';
 import QuestionViewerPhone from '../components/survey/QuestionViewerPhone';
 import { MapPin, Calendar, Loader, AlertCircle, UserCheck, CircleAlert } from 'lucide-react';
-import { getSurvey, submitSurvey, getLocations, getUsers } from '../api';
-import Card from '../components/ui/Card';
+import { useSurveyDetail, useSubmitSurvey } from '../queries/useSurveys';
+import { useLocationsList } from '../queries/useLocations';
+import { useAllUsers } from '../queries/useUser';
+import Card from '../components/ui/CustomCard';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -19,19 +21,30 @@ const SurveyViewer = ({ embeddedId }) => {
     const navigate = useNavigate();
     const activeId = embeddedId || id;
 
-    const [survey, setSurvey] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    // React Query Hooks
+    const { data: survey, isLoading: loading, error: surveyError } = useSurveyDetail(activeId);
+    const { data: locationsData } = useLocationsList(!!survey?.requiere_ubicacion);
+    const { data: usersData } = useAllUsers(!!survey?.activar_encuestador_manual);
+    const { mutateAsync: sendSurvey } = useSubmitSurvey();
+
+    const error = surveyError ? "No se pudo cargar la encuesta. Intenta nuevamente." : null;
 
     const [answers, setAnswers] = useState({});
     const [locationData, setLocationData] = useState({ seccion: "", barrio: "" });
     const [customDate, setCustomDate] = useState("");
 
-    const [availableLocations, setAvailableLocations] = useState([]);
+    const availableLocations = useMemo(() => {
+        const rawLocs = locationsData?.results || locationsData;
+        return Array.isArray(rawLocs) ? rawLocs : [];
+    }, [locationsData]);
+
     const [availableBarrios, setAvailableBarrios] = useState([]);
 
-    // Manual Surveyor
-    const [availableUsers, setAvailableUsers] = useState([]);
+    const availableUsers = useMemo(() => {
+        const rawUsrs = usersData?.results || usersData;
+        return Array.isArray(rawUsrs) ? rawUsrs : [];
+    }, [usersData]);
+
     const [manualSurveyorId, setManualSurveyorId] = useState("");
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,42 +74,6 @@ const SurveyViewer = ({ embeddedId }) => {
             return next;
         });
     };
-
-    useEffect(() => {
-        const loadData = async () => {
-            if (!activeId) return;
-            setLoading(true);
-            try {
-                const [surveyData, locationsData] = await Promise.all([
-                    getSurvey(activeId),
-                    getLocations().catch(err => [])
-                ]);
-
-                setSurvey(surveyData);
-                const rawLocations = locationsData.results || locationsData;
-                setAvailableLocations(Array.isArray(rawLocations) ? rawLocations : []);
-
-                if (surveyData.activar_encuestador_manual) {
-                    try {
-                        const usersData = await getUsers();
-                        // Assume format is array of objects {id, first_name, last_name, username} format.
-                        // Or if it's paginated, usersData.results
-                        const rawUsers = usersData.results || usersData;
-                        setAvailableUsers(Array.isArray(rawUsers) ? rawUsers : []);
-                    } catch (e) {
-                        console.error('Error fetching users:', e);
-                    }
-                }
-
-            } catch (err) {
-                console.error(err);
-                setError("No se pudo cargar la encuesta. Intenta nuevamente.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
-    }, [activeId]);
 
     const handleAnswerChange = (qId, value) => {
         setAnswers(prev => ({ ...prev, [qId]: value }));
@@ -219,7 +196,7 @@ const SurveyViewer = ({ embeddedId }) => {
         }
 
         try {
-            await submitSurvey(survey.id, finalPayload);
+            await sendSurvey({ id: survey.id, payload: finalPayload });
             setIsSubmitting(false);
             setIsConfirmModalOpen(false);
             setAlertModal({

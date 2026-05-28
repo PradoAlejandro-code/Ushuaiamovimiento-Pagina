@@ -230,7 +230,7 @@ const ContactViewerPage = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <div className="min-w-0">
-                        <h1 className="text-2xl font-black tracking-tight">Contactos</h1>
+                        <h1 className="text-2xl font-black tracking-tight">Agenda de Seguimiento</h1>
                         {surveyName && (
                             <p className="text-content-secondary text-[10px] font-black uppercase tracking-widest mt-0.5">
                                 {surveyName}

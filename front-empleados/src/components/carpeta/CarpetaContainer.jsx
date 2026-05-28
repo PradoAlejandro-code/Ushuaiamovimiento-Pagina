@@ -1,46 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { getMyResponses } from '../../api';
-import Card from '../ui/Card';
+import React, { useState } from 'react';
+import { useMyResponses } from '../../queries/useResponses';
+import Card from '../ui/CustomCard';
 import { Calendar, MapPin, Eye, ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import MyResponseDetail from './MyResponseDetail';
 import { Skeleton } from '../ui/skeleton';
 
 const CarpetaContainer = () => {
-    const [responses, setResponses] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [selectedResponseId, setSelectedResponseId] = useState(null);
     
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [hasNext, setHasNext] = useState(false);
-    const [hasPrev, setHasPrev] = useState(false);
 
-    useEffect(() => {
-        const fetchResponses = async () => {
-            setLoading(true);
-            try {
-                const data = await getMyResponses(currentPage);
-                if (data && data.results) {
-                    setResponses(data.results);
-                    setHasNext(!!data.next);
-                    setHasPrev(!!data.previous);
-                    setTotalPages(Math.max(1, Math.ceil(data.count / 10)));
-                } else {
-                    setResponses(data || []);
-                    setTotalPages(1);
-                    setHasNext(false);
-                    setHasPrev(false);
-                }
-            } catch (error) {
-                console.error("Error fetching my responses", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    // Fetch My Responses with React Query
+    const { data, isLoading: loading } = useMyResponses(currentPage);
 
-        fetchResponses();
-    }, [currentPage]);
+    const responses = data?.results || data || [];
+    const hasNext = !!data?.next;
+    const hasPrev = !!data?.previous;
+    const totalPages = data?.count ? Math.max(1, Math.ceil(data.count / 10)) : 1;
 
     if (selectedResponseId) {
         return <MyResponseDetail responseId={selectedResponseId} onBack={() => setSelectedResponseId(null)} />;

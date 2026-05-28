@@ -221,3 +221,24 @@ html {
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
 }
+
+@keyframes purple-pulse-glow {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.4)) drop-shadow(0 0 6px rgba(168, 85, 247, 0.2));
+    }
+    50% {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.8)) drop-shadow(0 0 16px rgba(168, 85, 247, 0.5));
+    }
+}
+
+.animate-purple-glow {
+    animation: purple-pulse-glow 2s infinite ease-in-out;
+    color: #a855f7 !important;
+}
+
+.animate-purple-text {
+    color: #a855f7 !important;
+    text-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
