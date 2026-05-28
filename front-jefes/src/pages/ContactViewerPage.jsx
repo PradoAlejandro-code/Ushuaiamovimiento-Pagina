@@ -1,60 +1,80 @@
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getSurvey } from "@/api/surveys";
-import { getContacts, saveContact, deleteContact, importContacts } from "@/api/contacts";
-import { ArrowLeft, Loader, Download, MessageCircle, Search, Plus, Upload, Trash2, Edit2, X, Save, Phone, Tag, User, Mail, CreditCard } from "lucide-react";
+import { useContactsList, useSaveContact, useDeleteContact, useImportContacts } from '@/queries/useContacts';
+import { useSurveyDetail, useSurveyResponseDetail } from '@/queries/useSurveys';
+import { useExportContacts, useExportContactsExcel } from '@/queries/useExport';
+import {
+    ArrowLeft, Loader, Download, MessageCircle, Search, Plus,
+    Upload, Trash2, Edit2, Mail, CreditCard, Tag, User, X, Phone, ChevronDown,
+    Users, LayoutGrid, ClipboardList
+} from "lucide-react";
+
 import Card from '../components/ui/Card';
 import WhatsAppQRButton from '../components/ui/WhatsAppQRButton';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import ContactEditModal from "../components/contact/ContactEditModal"; // Lógica de contacto separada
+import SurveyResponseDetailCard from '../components/survey/SurveyResponseDetailCard';
+import MyButton from '../components/ui/MyButton';
 
 const ContactViewerPage = () => {
-    const { id } = useParams(); // ID de la encuesta, si venimos de una
+    const { id } = useParams();
     const navigate = useNavigate();
 
-    const [contacts, setContacts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { data: contactsData, isLoading: loading } = useContactsList(id);
+    const contacts = contactsData?.results || contactsData || [];
+
+    const { data: surveyData } = useSurveyDetail(id);
+    const surveyName = surveyData?.nombre || "";
+
+    const [originResponseId, setOriginResponseId] = useState(null);
+    const { data: originResponseRaw, isLoading: loadingOrigin } = useSurveyResponseDetail(originResponseId);
+
+    const originResponse = useMemo(() => {
+        if (!originResponseRaw) return null;
+        const data = { ...originResponseRaw };
+        const sourceDetails = data.detalles_completos || data.detalles || [];
+        if (sourceDetails.length) {
+            data.detalles = sourceDetails.map(detalle => ({
+                ...detalle,
+                pregunta_id: detalle.pregunta_id !== undefined ? detalle.pregunta_id : detalle.pregunta
+            }));
+        }
+        return data;
+    }, [originResponseRaw]);
+
+    // ==========================================
+    // 2. ESTADOS LOCALES DE UI
+    // ==========================================
     const [filter, setFilter] = useState("");
-    const [surveyName, setSurveyName] = useState("");
-
-    // Modals state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-
-    // Form state for Create/Edit
-    const [currentContact, setCurrentContact] = useState({ nombre: '', celular: '', email: '', dni: '', tag: '' });
-    const [saving, setSaving] = useState(false);
-
-    // Form state for Import
+    const [currentContact, setCurrentContact] = useState(null);
+    const [saveContactStatus, setSaveContactStatus] = useState(null);
     const [importData, setImportData] = useState(null);
     const [importTag, setImportTag] = useState('importado');
-    const [importing, setImporting] = useState(false);
+    const [importStatus, setImportStatus] = useState(null);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    const [exportStatus, setExportStatus] = useState(null);
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [id]);
+    // ==========================================
+    // 3. MUTACIONES Y ACCIONES (React Query)
+    // ==========================================
+    const { mutateAsync: saveContactMut, isPending: saving } = useSaveContact();
+    const { mutateAsync: deleteContactMut, isPending: isDeleting } = useDeleteContact();
+    const { mutateAsync: importContactsMut, isPending: importing } = useImportContacts();
 
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            // Cargar datos de contactos (Centralizado)
-            const data = await getContacts();
-            setContacts(data);
-
-            // Si hay ID, solo cargamos el nombre de la encuesta para contexto, pero mostramos todos los contactos
-            // (O en el futuro filtraríamos si el backend lo soporta)
-            if (id) {
-                const sData = await getSurvey(id);
-                setSurveyName(sData.nombre);
-            }
-        } catch (error) {
-            console.error("Error loading contacts", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Filter logic
+    // Lógica de filtrado local (sesgada por la página actual de la API)
     const filteredContacts = contacts.filter(c =>
         (c.nombre || "").toLowerCase().includes(filter.toLowerCase()) ||
         (c.tag || "").toLowerCase().includes(filter.toLowerCase()) ||
@@ -63,9 +83,9 @@ const ContactViewerPage = () => {
         (c.dni || "").includes(filter)
     );
 
-    // --- Actions ---
+    // --- ACCIONES DE CONTACTO ---
 
-    const handleCreateClick = () => {
+    const handleAddClick = () => {
         setCurrentContact({ nombre: '', celular: '', email: '', dni: '', tag: 'manual' });
         setIsEditModalOpen(true);
     };
@@ -75,477 +95,428 @@ const ContactViewerPage = () => {
         setIsEditModalOpen(true);
     };
 
-    const handleDeleteClick = async (contactId) => {
-        if (!window.confirm("¿Seguro que deseas eliminar este contacto?")) return;
+    const handleSaveContact = async (formData) => {
+        setSaveContactStatus(null);
         try {
-            await deleteContact(contactId);
-            setContacts(contacts.filter(c => c.id !== contactId));
+            await saveContactMut(formData);
+            setSaveContactStatus('success');
+            setTimeout(() => {
+                setIsEditModalOpen(false);
+                setSaveContactStatus(null);
+            }, 1000);
         } catch (error) {
-            console.error("Error deleting contact", error);
-            alert("Error al eliminar contacto");
+            alert("Error al guardar: verifique si el celular ya existe.");
+            setSaveContactStatus('error');
+            setTimeout(() => setSaveContactStatus(null), 2000);
         }
     };
 
-    const handleSaveContact = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+    const handleDeleteRequest = (contact) => {
+        setCurrentContact(contact);
+        setIsConfirmModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
         try {
-            const saved = await saveContact(currentContact);
-            if (currentContact.id) {
-                // Update list
-                setContacts(contacts.map(c => c.id === saved.id ? saved : c));
-            } else {
-                // Add to list
-                setContacts([saved, ...contacts]);
-            }
-            setIsEditModalOpen(false);
+            await deleteContactMut(currentContact.id);
+            setIsConfirmModalOpen(false);
         } catch (error) {
-            console.error("Error saving contact", error);
-            alert("Error al guardar contacto. Verifique que el número no esté duplicado.");
-        } finally {
-            setSaving(false);
+            alert("Error al eliminar.");
         }
     };
+
+    const handleViewOrigin = (respuestaId) => {
+        setOriginResponseId(respuestaId);
+    };
+
+    // --- IMPORTACIÓN Y EXPORTACIÓN ---
+    const { mutateAsync: exportContactsMut, isPending: downloading } = useExportContacts();
+    const { mutateAsync: exportContactsExcelMut, isPending: downloadingExcel } = useExportContactsExcel();
 
     const handleImportContacts = async (e) => {
         e.preventDefault();
-        if (!importData) {
-            alert("Selecciona un archivo CSV.");
-            return;
-        }
-        setImporting(true);
-
+        if (!importData) return;
+        setImportStatus(null);
         try {
-            // Enviamos el archivo directamente al backend
-            const result = await importContacts(importData, importTag);
+            const formData = new FormData();
+            formData.append('file', importData);
+            formData.append('tag', importTag);
 
-            alert(result.message); // El backend devuelve "message" con el resumen
+            const result = await importContactsMut(formData);
 
-            setIsImportModalOpen(false);
-            setImportData(null);
-            loadData();
+            alert(result.message);
+            setImportStatus('success');
+            setTimeout(() => {
+                setIsImportModalOpen(false);
+                setImportData(null);
+                setImportStatus(null);
+            }, 1000);
         } catch (error) {
-            console.error("Error importing", error);
-            alert("Hubo un error en la importación: " + error.message);
-        } finally {
-            setImporting(false);
+            alert("Error en la importación.");
+            setImportStatus('error');
+            setTimeout(() => setImportStatus(null), 2000);
         }
     };
 
-    const [downloading, setDownloading] = useState(false);
-    const handleDownload = () => {
-        setDownloading(true);
+    const handleDownload = async () => {
+        setExportStatus(null);
         try {
-            // Google Contacts CSV Format headers
-            const headers = [
-                "Name",
-                "Given Name",
-                "Phone 1 - Type",
-                "Phone 1 - Value",
-                "E-mail 1 - Type",
-                "E-mail 1 - Value",
-                "Organization 1 - Name", // Usamos Organization para el Tag
-                "Notes" // Usamos Notes para DNI
-            ];
+            const params = { search: filter };
+            const response = await exportContactsMut(params);
 
-            // Helper to escape CSV fields
-            const escapeCsv = (text) => {
-                if (!text) return "";
-                const stringText = String(text);
-                if (stringText.includes(",") || stringText.includes('"') || stringText.includes("\n")) {
-                    return `"${stringText.replace(/"/g, '""')}"`;
-                }
-                return stringText;
-            };
+            const blob = new Blob([response.data], { type: 'application/zip' });
+            const url = window.URL.createObjectURL(blob);
 
-            const rows = filteredContacts.map(c => {
-                return [
-                    escapeCsv(c.nombre), // Name
-                    escapeCsv(c.nombre), // Given Name (repetimos para asegurar)
-                    "Mobile", // Phone 1 - Type
-                    escapeCsv(c.celular), // Phone 1 - Value
-                    "Home", // E-mail 1 - Type
-                    escapeCsv(c.email), // E-mail 1 - Value
-                    escapeCsv(c.tag), // Organization as Tag
-                    escapeCsv(c.dni ? `DNI: ${c.dni}` : "") // Notes
-                ].join(",");
-            });
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.setAttribute('download', `contactos_${new Date().toISOString().slice(0, 10)}.zip`);
+            document.body.appendChild(anchor);
+            anchor.click();
 
-            const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n"); // Add BOM for Excel/UTF-8
-            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = `google_contacts_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(downloadUrl);
+            anchor.parentNode.removeChild(anchor);
+            window.URL.revokeObjectURL(url);
 
+            setExportStatus('success');
+            setTimeout(() => setExportStatus(null), 2000);
         } catch (error) {
-            console.error("Falló la descarga:", error);
-            alert("No se pudo generar el archivo.");
-        } finally {
-            setDownloading(false);
+            console.error("Error al exportar contactos:", error);
+            alert("Ocurrió un error al intentar generar el archivo exportado.");
+            setExportStatus('error');
+            setTimeout(() => setExportStatus(null), 2000);
+        }
+    };
+
+    const handleDownloadExcel = async () => {
+        setIsExportMenuOpen(false);
+        setExportStatus(null);
+        try {
+            const params = { search: filter };
+            const response = await exportContactsExcelMut(params);
+
+            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.setAttribute('download', `contactos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            document.body.appendChild(anchor);
+            anchor.click();
+
+            anchor.parentNode.removeChild(anchor);
+            window.URL.revokeObjectURL(url);
+
+            setExportStatus('success');
+            setTimeout(() => setExportStatus(null), 2000);
+        } catch (error) {
+            console.error("Error al exportar contactos a Excel:", error);
+            alert("Ocurrió un error al intentar generar el archivo Excel exportado.");
+            setExportStatus('error');
+            setTimeout(() => setExportStatus(null), 2000);
         }
     };
 
     if (loading) return <div className="flex justify-center p-20"><Loader className="animate-spin text-brand-blue" /></div>;
 
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="max-w-7xl mx-auto py-6 px-4 bg-surface-primary text-content-primary min-h-screen">
+
+            {/* --- HEADER DESNUDO (ESTILO SIN CARD) --- */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(id ? `/surveys/${id}` : '/surveys')} className="p-2 hover:bg-surface-secondary rounded-full shadow-sm text-content-secondary hover:text-content-primary transition-colors">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="p-2 hover:bg-surface-secondary rounded-full transition-colors text-content-secondary"
+                    >
                         <ArrowLeft size={24} />
                     </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-content-primary">
-                            Visualizador de Contactos
-                        </h1>
-                        <p className="text-content-secondary text-sm">
-                            {surveyName ? `Contexto: ${surveyName}` : "Base de Datos Centralizada"}
-                        </p>
+                    <div className="min-w-0">
+                        <h1 className="text-2xl font-black tracking-tight">Contactos</h1>
+                        {surveyName && (
+                            <p className="text-content-secondary text-[10px] font-black uppercase tracking-widest mt-0.5">
+                                {surveyName}
+                            </p>
+                        )}
                     </div>
                 </div>
-
                 <div className="flex gap-2">
                     <button
                         onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-surface-secondary border border-border-base text-content-primary rounded-lg hover:bg-surface-tertiary transition-colors"
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-secondary border border-border-base rounded-xl font-bold text-sm hover:bg-surface-tertiary transition-all"
                     >
-                        <Upload size={18} />
-                        <span className="hidden md:inline">Importar CSV</span>
+                        <Upload size={18} /> Importar
                     </button>
                     <button
-                        onClick={handleCreateClick}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                        onClick={handleAddClick}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-blue text-white rounded-xl shadow-lg shadow-blue-900/20 font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all"
                     >
-                        <Plus size={18} />
-                        <span className="hidden md:inline">Nuevo Contacto</span>
+                        <Plus size={18} /> Nuevo
                     </button>
                 </div>
             </div>
 
-            {/* Toolbar */}
-            <Card className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between !p-4">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-2.5 text-content-secondary" size={18} />
+            {/* --- TOOLBAR --- */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
+                <div className="md:col-span-8 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-content-secondary" size={18} />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre, email, tag o celular..."
-                        className="w-full pl-10 pr-4 py-2 bg-surface-secondary border border-border-base rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/30 text-content-primary placeholder-content-secondary/50"
+                        placeholder="Buscar por nombre, tag, celular..."
+                        className="w-full pl-12 pr-4 py-3 bg-surface-secondary border border-border-base rounded-xl focus:ring-2 focus:ring-brand-blue/20 outline-none font-medium transition-all"
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
                     />
                 </div>
+                <div className="md:col-span-4 relative flex flex-col items-end">
+                    <button
+                        onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                        disabled={downloading || downloadingExcel}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-emerald-600 text-white rounded-xl font-black text-sm shadow-md hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                    >
+                        <div className="flex items-center gap-2">
+                            {downloading || downloadingExcel ? <Loader size={18} className="animate-spin" /> : <Download size={18} />}
+                            {downloading ? "Exportando CSV..." : downloadingExcel ? "Exportando Excel..." : "Exportar"}
+                        </div>
+                        <ChevronDown size={18} className={`transition-transform ${isExportMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
 
-                <button
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg shadow-sm w-full md:w-auto justify-center font-medium
-                        ${downloading
-                            ? 'bg-surface-secondary text-content-secondary cursor-not-allowed border border-border-base'
-                            : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-                >
-                    {downloading ? <Loader size={18} className="animate-spin" /> : <Download size={18} />}
-                    {downloading ? 'Generando...' : 'Descargar CSV'}
-                </button>
-            </Card>
+                    {isExportMenuOpen && (
+                        <div className="absolute top-14 left-0 w-full bg-surface-primary border border-border-base rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            <button
+                                onClick={handleDownload}
+                                className="w-full text-left px-4 py-3 text-sm font-bold text-content-primary hover:bg-surface-secondary transition-colors border-b border-border-base flex items-center gap-3"
+                            >
+                                <Users size={16} className="text-content-secondary" />
+                                Exportar Google Contacts (.csv)
+                            </button>
+                            <button
+                                onClick={handleDownloadExcel}
+                                className="w-full text-left px-4 py-3 text-sm font-bold text-content-primary hover:bg-surface-secondary transition-colors flex items-center gap-3"
+                            >
+                                <LayoutGrid size={16} className="text-content-secondary" />
+                                Exportar Reporte Excel (.xlsx)
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-            {/* Table */}
-            <Card className="!p-0 overflow-hidden">
-                <div className="overflow-x-auto">
+            {/* --- LISTA DE CONTACTOS RESPONSIVA --- */}
+
+            {/* MÓVIL: Vista de Cards */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+                {filteredContacts.map(c => (
+                    <Card key={c.id || c.celular} className="p-4 border-border-base bg-surface-primary shadow-sm flex flex-col gap-4">
+                        {/* Fila 1: Nombre y Teléfono */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 shrink-0 bg-brand-blue/10 text-brand-blue rounded-xl flex items-center justify-center font-black border border-brand-blue/10">
+                                {c.nombre?.charAt(0).toUpperCase() || <User size={18} />}
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-content-primary truncate">{c.nombre || "Sin nombre"}</h3>
+                                <p className="text-xs text-content-secondary font-mono font-bold">{c.celular}</p>
+                            </div>
+                        </div>
+
+                        {/* Fila 2: Botones de acciones */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-border-base/50">
+                            {c.primera_respuesta_id && (
+                                <button
+                                    onClick={() => handleViewOrigin(c.primera_respuesta_id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-all"
+                                    title="Ver Respuesta Original"
+                                >
+                                    <ClipboardList size={14} />
+                                    Origen
+                                </button>
+                            )}
+                            <div className="flex gap-1 ml-auto">
+                                <button onClick={() => handleEditClick(c)} className="p-2 text-content-secondary hover:text-brand-blue bg-surface-secondary rounded-lg transition-colors border border-border-base">
+                                    <Edit2 size={16} />
+                                </button>
+                                <button onClick={() => handleDeleteRequest(c)} className="p-2 text-red-500 hover:text-red-600 bg-red-50 rounded-lg transition-colors border border-red-100">
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Fila 3: Comunicación (WhatsApp y QR) */}
+                        <div className="flex gap-2">
+                            <a
+                                href={`https://wa.me/${c.celular?.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center justify-center p-2 bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500/20 transition-all border border-emerald-500/20"
+                            >
+                                <MessageCircle size={18} />
+                            </a>
+                            <WhatsAppQRButton phoneNumber={c.celular} name={c.nombre} />
+                        </div>
+
+                        {/* Fila 4: Tags */}
+                        <div className="flex flex-wrap gap-1">
+                            {(c.tag ? c.tag.split(',') : ['General']).map((t, i) => (
+                                <span key={i} className="px-2.5 py-1 bg-surface-secondary rounded-lg text-[10px] font-black uppercase tracking-widest text-content-secondary flex items-center gap-1.5 border border-border-base">
+                                    {i === 0 && <Tag size={10} />}
+                                    {t.trim()}
+                                </span>
+                            ))}
+                        </div>
+                    </Card>
+                ))}
+            </div>
+
+            {/* ESCRITORIO: Tabla Clásica */}
+            <div className="hidden md:block">
+                <Card className="!p-0 overflow-hidden border-border-base shadow-xl rounded-2xl bg-surface-primary">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-surface-secondary border-b border-border-base text-xs font-semibold text-content-secondary uppercase tracking-wider">
+                            <tr className="bg-surface-secondary/50 border-b border-border-base text-[10px] font-black text-content-secondary uppercase tracking-widest">
                                 <th className="p-4 pl-6">Nombre</th>
-                                <th className="p-4">Teléfono</th>
-                                <th className="p-4">Email / DNI</th>
-                                <th className="p-4">Tag</th>
-                                <th className="p-4 text-right">Actualizado</th>
+                                <th className="p-4">Teléfono / WhatsApp</th>
+                                <th className="p-4">Etiqueta</th>
                                 <th className="p-4 text-right pr-6">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border-base">
-                            {filteredContacts.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="p-12 text-center text-content-secondary">
-                                        {filter ? "No hay resultados para tu búsqueda." : "No se encontraron contactos."}
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredContacts.map((c) => (
-                                    <tr key={c.id || c.celular} className="hover:bg-brand-blue/5 group transition-colors">
-                                        <td className="p-4 pl-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 bg-brand-blue/10 rounded-full flex items-center justify-center text-brand-blue font-bold border border-brand-blue/20 text-sm">
-                                                    {(c.nombre && c.nombre !== "No especificado") ? c.nombre.charAt(0).toUpperCase() : <User size={16} />}
-                                                </div>
-                                                <span className="font-semibold text-content-primary text-sm">
-                                                    {c.nombre || "Sin Nombre"}
-                                                </span>
+                            {filteredContacts.map(c => (
+                                <tr key={c.id} className="hover:bg-brand-blue/5 transition-colors group">
+                                    <td className="p-4 pl-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-brand-blue/10 text-brand-blue rounded-lg flex items-center justify-center font-black text-xs border border-brand-blue/10">
+                                                {c.nombre?.charAt(0).toUpperCase()}
                                             </div>
-                                        </td>
-
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-content-primary font-mono text-sm">{c.celular}</span>
+                                            <span className="font-bold text-sm text-content-primary">{c.nombre}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-mono text-sm font-bold text-content-primary">{c.celular}</span>
+                                            <div className="flex items-center gap-1">
                                                 <a
-                                                    href={`https://wa.me/${(c.celular || '').replace(/\D/g, '')}`}
+                                                    href={`https://wa.me/${c.celular?.replace(/\D/g, '')}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 opacity-70 group-hover:opacity-100 transition-opacity"
-                                                    title="Abrir WhatsApp Web"
+                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 transition-colors"
                                                 >
-                                                    <MessageCircle size={16} />
+                                                    <MessageCircle size={14} />
                                                 </a>
-                                                <WhatsAppQRButton
-                                                    phoneNumber={c.celular}
-                                                    name={c.nombre}
-                                                />
+                                                <WhatsAppQRButton phoneNumber={c.celular} name={c.nombre} />
                                             </div>
-                                        </td>
-
-                                        <td className="p-4">
-                                            <div className="flex flex-col text-sm">
-                                                {c.email && (
-                                                    <div className="flex items-center gap-1.5 text-content-primary mb-0.5">
-                                                        <Mail size={12} className="text-content-secondary" />
-                                                        <span>{c.email}</span>
-                                                    </div>
-                                                )}
-                                                {c.dni && (
-                                                    <div className="flex items-center gap-1.5 text-content-secondary">
-                                                        <CreditCard size={12} />
-                                                        <span>{c.dni}</span>
-                                                    </div>
-                                                )}
-                                                {!c.email && !c.dni && <span className="text-content-secondary text-xs italic">Sin datos extra</span>}
-                                            </div>
-                                        </td>
-
-                                        <td className="p-4">
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-content-secondary border border-border-base">
-                                                <Tag size={12} />
-                                                {c.tag || 'General'}
-                                            </span>
-                                        </td>
-
-                                        <td className="p-4 text-right text-sm text-content-secondary">
-                                            {c.ultima_actualizacion ? new Date(c.ultima_actualizacion).toLocaleDateString() : '-'}
-                                        </td>
-
-                                        <td className="p-4 text-right pr-6">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleEditClick(c)}
-                                                    className="p-1.5 text-content-secondary hover:text-brand-blue hover:bg-brand-blue/10 rounded transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(c.id)}
-                                                    className="p-1.5 text-content-secondary hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            {(c.tag ? c.tag.split(',') : ['General']).map((t, i) => (
+                                                <span key={i} className="px-2 py-1 bg-surface-secondary rounded-lg text-[10px] font-black uppercase tracking-wider text-content-secondary border border-border-base">
+                                                    {t.trim()}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-right pr-6 space-x-1">
+                                        {c.primera_respuesta_id && (
+                                            <button
+                                                onClick={() => handleViewOrigin(c.primera_respuesta_id)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-all mr-1"
+                                                title="Ver Respuesta Original"
+                                            >
+                                                <ClipboardList size={14} />
+                                                Origen
+                                            </button>
+                                        )}
+                                        <button onClick={() => handleEditClick(c)} className="p-2 text-content-secondary hover:text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-all"><Edit2 size={16} /></button>
+                                        <button onClick={() => handleDeleteRequest(c)} className="p-2 text-content-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={16} /></button>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
-                </div>
-            </Card>
+                </Card>
+            </div>
 
-            {/* Modal Create/Edit */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface-primary rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-4 border-b border-border-base flex justify-between items-center bg-surface-secondary">
-                            <h2 className="text-lg font-bold text-content-primary">
-                                {currentContact.id ? 'Editar Contacto' : 'Nuevo Contacto'}
-                            </h2>
-                            <button onClick={() => setIsEditModalOpen(false)} className="text-content-secondary hover:text-content-primary">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSaveContact} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Nombre Completo</label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
-                                        placeholder="Juan Pérez"
-                                        value={currentContact.nombre || ''}
-                                        onChange={(e) => setCurrentContact({ ...currentContact, nombre: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Celular (Único)</label>
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
-                                        placeholder="+54 9 11 1234 5678"
-                                        value={currentContact.celular || ''}
-                                        onChange={(e) => setCurrentContact({ ...currentContact, celular: e.target.value })}
-                                    />
-                                </div>
-                                <p className="text-xs text-content-secondary mt-1">El número será limpiado y guardado como identificador.</p>
-                            </div>
+            {/* --- MODALES --- */}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-content-secondary mb-1">Email</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                        <input
-                                            type="email"
-                                            className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
-                                            placeholder="juan@email.com"
-                                            value={currentContact.email || ''}
-                                            onChange={(e) => setCurrentContact({ ...currentContact, email: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-content-secondary mb-1">DNI</label>
-                                    <div className="relative">
-                                        <CreditCard className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                        <input
-                                            type="text"
-                                            className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
-                                            placeholder="12345678"
-                                            value={currentContact.dni || ''}
-                                            onChange={(e) => setCurrentContact({ ...currentContact, dni: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+            <ContactEditModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                onSave={handleSaveContact}
+                contact={currentContact}
+                saving={saving}
+                saveStatus={saveContactStatus}
+            />
 
-                            <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Tag / Etiqueta</label>
-                                <div className="relative">
-                                    <Tag className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                    <input
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none bg-surface-primary text-content-primary"
-                                        placeholder="cliente, proveedor, encuesta..."
-                                        value={currentContact.tag || ''}
-                                        onChange={(e) => setCurrentContact({ ...currentContact, tag: e.target.value })}
-                                    />
-                                </div>
-                            </div>
+            <AlertDialog open={isConfirmModalOpen} onOpenChange={(open) => !open && setIsConfirmModalOpen(false)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {`Estás borrando a ${currentContact?.nombre}. Esta acción no se puede deshacer.`}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting}>Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-border-base rounded-lg text-content-secondary hover:bg-surface-secondary transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="flex-1 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors flex justify-center items-center gap-2"
-                                >
-                                    {saving ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
-                                    Guardar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal Import */}
+            {/* Modal de Importación (Simplificado e integrado) */}
             {isImportModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface-primary rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-4 border-b border-border-base flex justify-between items-center bg-surface-secondary">
-                            <h2 className="text-lg font-bold text-content-primary">Importar Contactos (CSV Google)</h2>
-                            <button onClick={() => setIsImportModalOpen(false)} className="text-content-secondary hover:text-content-primary">
-                                <X size={20} />
-                            </button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface-primary border border-border-base rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-border-base flex justify-between items-center bg-surface-secondary/50">
+                            <h2 className="text-lg font-black text-content-primary">Importar CSV</h2>
+                            <button onClick={() => setIsImportModalOpen(false)} className="text-content-secondary hover:text-content-primary"><X size={20} /></button>
                         </div>
-                        <form onSubmit={handleImportContacts} className="p-6 space-y-4">
+                        <form onSubmit={handleImportContacts} className="p-6 space-y-5">
                             <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Tag para estos importados</label>
-                                <div className="relative">
-                                    <Tag className="absolute left-3 top-2.5 text-content-secondary" size={18} />
-                                    <input
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2 border border-border-base rounded-lg focus:ring-2 focus:ring-brand-blue/20 outline-none bg-surface-primary text-content-primary"
-                                        value={importTag}
-                                        onChange={(e) => setImportTag(e.target.value)}
-                                        placeholder="ej: lote-enero"
-                                    />
-                                </div>
-                                <p className="text-xs text-content-secondary mt-1">Este tag sobrescribirá el campo 'Organization' del CSV si se deja vacío, o se usará como fallback.</p>
+                                <label className="block text-[10px] font-black text-content-secondary uppercase tracking-widest mb-1.5 ml-1">Etiqueta del lote</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-2.5 bg-surface-secondary border border-border-base rounded-xl focus:ring-2 focus:ring-brand-blue/20 outline-none text-content-primary font-bold text-sm"
+                                    value={importTag}
+                                    onChange={(e) => setImportTag(e.target.value)}
+                                    placeholder="ej: relevamiento-2026"
+                                />
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-content-secondary mb-1">Archivo CSV</label>
-                                <div className="flex items-center justify-center w-full">
-                                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border-base border-dashed rounded-lg cursor-pointer bg-surface-secondary hover:bg-surface-tertiary transition-colors">
-                                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            <Upload className="w-8 h-8 mb-4 text-content-secondary" />
-                                            <p className="mb-2 text-sm text-content-secondary"><span className="font-semibold">Click para subir</span> o arrastra</p>
-                                            <p className="text-xs text-content-secondary">CSV de Google Contacts</p>
-                                        </div>
-                                        <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                if (e.target.files && e.target.files[0]) {
-                                                    setImportData(e.target.files[0]);
-                                                }
-                                            }}
-                                        />
-                                    </label>
-                                </div>
-                                {importData && (
-                                    <p className="text-sm text-emerald-600 mt-2 font-medium flex items-center gap-1">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                                        Archivo seleccionado: {importData.name}
-                                    </p>
-                                )}
-                            </div>
-
+                            <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-border-base border-dashed rounded-2xl cursor-pointer bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-all">
+                                <Upload className="w-8 h-8 mb-3 text-content-secondary" />
+                                <p className="text-sm text-content-primary font-bold">Seleccionar archivo CSV</p>
+                                <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && setImportData(e.target.files[0])} />
+                                {importData && <p className="text-xs text-emerald-500 mt-2 font-black uppercase tracking-tighter">{importData.name}</p>}
+                            </label>
                             <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsImportModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-border-base rounded-lg text-content-secondary hover:bg-surface-secondary transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
+                                <button type="button" onClick={() => setIsImportModalOpen(false)} className="flex-1 px-4 py-3 border border-border-base rounded-xl text-content-secondary font-bold text-sm">Cancelar</button>
+                                <MyButton
                                     type="submit"
                                     disabled={importing || !importData}
-                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {importing ? <Loader size={18} className="animate-spin" /> : <Upload size={18} />}
-                                    Importar
-                                </button>
+                                    status={importing ? 'loading' : importStatus}
+                                    defaultText="Importar"
+                                    loadingText="Importando..."
+                                    successText="Importado"
+                                    errorText="Error"
+                                    defaultIcon={<Upload size={18} />}
+                                    className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-900/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                                />
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+
+            {/* Modal de Respuesta de Origen */}
+            {(originResponse || loadingOrigin) && (
+                <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-20 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 pt-16 md:p-6 animate-in fade-in duration-200">
+                    <div className="w-full max-w-4xl relative h-full max-h-screen md:max-h-[90vh]">
+                        <SurveyResponseDetailCard
+                            respuesta={originResponse}
+                            isLoading={loadingOrigin}
+                            onBack={() => setOriginResponseId(null)}
+                        />
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

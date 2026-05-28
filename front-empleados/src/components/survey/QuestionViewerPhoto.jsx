@@ -1,166 +1,218 @@
-import { useState, useEffect, useRef } from 'react';
-import { Camera, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import imageCompression from 'browser-image-compression';
+import { CircleAlert } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardAction } from "@/components/ui/card";
 
 const QuestionViewerPhoto = ({ question, onChange, value, onProcessingStatus }) => {
-    const [previews, setPreviews] = useState([]);
-    const [processingCount, setProcessingCount] = useState(0);
-    const abortControllerRef = useRef(null);
+    // Estado interno que guarda objetos: { id, file, previewUrl }
+    const [images, setImages] = useState([]);
+    const [warningMsg, setWarningMsg] = useState('');
+    const [isDragging, setIsDragging] = useState(false);
 
-    // Notificar al padre sobre el estado de procesamiento
+    // Estado para controlar la pantalla de carga general
+    const [isProcessingAll, setIsProcessingAll] = useState(false);
+
+    const fileInputRef = useRef(null);
+
+    // 1. Sincronización Inicial (Carga URLs guardadas de tu backend)
     useEffect(() => {
-        if (onProcessingStatus) {
-            onProcessingStatus(question.id, processingCount > 0);
-        }
-    }, [processingCount, question.id, onProcessingStatus]);
-
-    // 1. Sincronización de Previsualizaciones
-    useEffect(() => {
-        if (value && Array.isArray(value)) {
-            const newPreviews = value.map(file => {
-                if (typeof file === 'string') return file;
-                if (file instanceof Blob) return URL.createObjectURL(file);
-                return null;
-            }).filter(Boolean);
-
-            setPreviews(newPreviews);
-
-            return () => {
-                newPreviews.forEach(url => {
-                    if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
-                });
-            };
-        } else {
-            setPreviews([]);
+        if (!value || value.length === 0) {
+            setImages([]);
+        } else if (images.length === 0 && value.length > 0) {
+            const initialImages = value.map((val, idx) => {
+                const isUrl = typeof val === 'string';
+                return {
+                    id: `init_${idx}_${Date.now()}`,
+                    file: val,
+                    previewUrl: isUrl ? val : URL.createObjectURL(val)
+                };
+            });
+            setImages(initialImages);
         }
     }, [value]);
 
-    const handleFileChange = async (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const selectedFiles = Array.from(e.target.files);
+    // Función para actualizar al padre
+    const updateParent = (currentImages) => {
+        const validFiles = currentImages.map(img => img.file);
+        onChange(validFiles.length > 0 ? validFiles : null);
+    };
 
-            // 2. Iniciamos el contador de carga con el total
-            setProcessingCount(selectedFiles.length);
+    // 2. PROCESAMIENTO ESTRICTO Y PREVIO
+    const processFiles = async (filesList) => {
+        const filesArray = Array.from(filesList);
 
-            const options = {
-                maxSizeMB: 0.6,
-                maxWidthOrHeight: 1024,
-                useWebWorker: true,
-                initialQuality: 0.7
-            };
+        // RECHAZO TOTAL: Si la suma de las que ya hay + las nuevas supera 10, no hacemos NADA.
+        if (images.length + filesArray.length > 10) {
+            setWarningMsg("⚠️ Solo puedes subir un máximo de 10 fotos en total.");
+            setTimeout(() => setWarningMsg(''), 4000);
+            return; // Cortamos la ejecución aquí
+        }
 
+        // Activamos la pantalla de carga
+        setIsProcessingAll(true);
+        if (onProcessingStatus) onProcessingStatus(question.id, true);
+
+        const processedImages = [];
+
+        // Comprimimos todas PRIMERO antes de mostrarlas
+        for (const f of filesArray) {
             try {
-                let currentFiles = Array.isArray(value) ? [...value] : [];
+                let safeName = f.name || 'foto.jpg';
+                if (safeName === 'blob' || safeName === 'image.blob' || !safeName.includes('.')) safeName = 'foto.jpg';
 
-                // 3. PROCESO SECUENCIAL: Actualizamos tras CADA foto
-                for (const file of selectedFiles) {
-                    let fileToSave = file;
+                const options = {
+                    maxSizeMB: 2.0,
+                    maxWidthOrHeight: 2048,
+                    useWebWorker: true,
+                    initialQuality: 0.90
+                };
 
-                    if (file.type.startsWith('image/')) {
-                        try {
-                            fileToSave = await imageCompression(file, options);
-                        } catch (err) {
-                            console.error("Error comprimiendo:", err);
-                        }
-                    }
+                const compressedBlob = await imageCompression(f, options);
+                const compressedFile = new File([compressedBlob], `optimizado_${safeName}`, { type: compressedBlob.type });
 
-                    currentFiles = [...currentFiles, fileToSave];
+                // Creamos la URL de preview SOLO para la imagen ya liviana
+                processedImages.push({
+                    id: `img_${Date.now()}_${Math.random()}`,
+                    file: compressedFile,
+                    previewUrl: URL.createObjectURL(compressedFile)
+                });
 
-                    // Notificamos al padre INMEDIATAMENTE
-                    onChange(currentFiles);
-
-                    // Bajamos el contador para que desaparezca un "Cargando" y aparezca la foto
-                    setProcessingCount(prev => Math.max(0, prev - 1));
-                }
             } catch (error) {
-                console.error("Error general:", error);
-                setProcessingCount(0);
-            } finally {
-                e.target.value = '';
+                console.error("Error al comprimir:", error);
             }
+        }
+
+        // Una vez que TODAS están listas y comprimidas, las sumamos al estado
+        const newTotalImages = [...images, ...processedImages];
+        setImages(newTotalImages);
+        updateParent(newTotalImages);
+
+        // Desactivamos la pantalla de carga
+        setIsProcessingAll(false);
+        if (onProcessingStatus) onProcessingStatus(question.id, false);
+    };
+
+    // 3. EVENTOS DRAG & DROP
+    const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+    const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFiles(e.dataTransfer.files);
         }
     };
 
-    const removeFile = (indexToRemove, e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const handleRemove = (idToRemove) => {
+        const removedImg = images.find(img => img.id === idToRemove);
+        const updatedImages = images.filter(img => img.id !== idToRemove);
 
-        // Si la previsualización que vamos a borrar es un Blob, lo liberamos de memoria
-        const photoToRemove = previews[indexToRemove];
-        if (photoToRemove && typeof photoToRemove === 'string' && photoToRemove.startsWith('blob:')) {
-            URL.revokeObjectURL(photoToRemove);
+        // Limpieza de RAM
+        if (removedImg && typeof removedImg.file !== 'string') {
+            URL.revokeObjectURL(removedImg.previewUrl);
         }
 
-        const updatedFiles = value.filter((_, idx) => idx !== indexToRemove);
-        onChange(updatedFiles.length > 0 ? updatedFiles : null);
+        setImages(updatedImages);
+        updateParent(updatedImages);
     };
 
     return (
-        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 border-l-4 border-l-brand-blue dark:border-l-brand-orange transition-all duration-300">
-            <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <label className="block text-xs font-bold text-brand-blue dark:text-brand-orange uppercase tracking-wide mb-1 transition-colors">
-                            {question.obligatoria ? "Foto Requerida *" : "Fotos Opcionales"}
-                        </label>
-                        <h3 className="text-lg font-medium text-content-primary transition-colors">
-                            {question.titulo}
-                        </h3>
+        <Card className="mb-4 relative border border-border-base border-l-4 border-l-brand-blue dark:border-l-brand-orange shadow-sm">
+            <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-bold text-brand-blue dark:text-brand-orange uppercase tracking-wide transition-colors">
+                    {question.obligatoria ? "Foto Requerida *" : "Fotos Opcionales"}
+                </CardDescription>
+                <CardTitle className="text-lg font-medium text-content-primary transition-colors">
+                    {question.titulo}
+                </CardTitle>
+                {question.obligatoria && (
+                    <CardAction>
+                        <div className="text-red-500 mt-1" title="Pregunta Obligatoria">
+                            <CircleAlert size={20} />
+                        </div>
+                    </CardAction>
+                )}
+            </CardHeader>
+
+            <CardContent>
+                {warningMsg && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-600 dark:text-red-400 text-sm font-semibold transition-all animate-in fade-in slide-in-from-top-2 mb-4">
+                        {warningMsg}
                     </div>
-                    {previews.length > 0 && processingCount === 0 && (
-                        <button onClick={() => onChange(null)} className="text-xs text-red-500 font-bold hover:underline">
-                            Borrar todas
-                        </button>
+                )}
+
+                {/* PANTALLA DE CARGA GENERAL */}
+                {isProcessingAll && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface-primary/80 backdrop-blur-[2px] transition-all rounded-xl">
+                        <div className="bg-surface-primary p-4 rounded-xl shadow-lg border border-border-base flex flex-col items-center">
+                            <div className="w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span className="text-sm font-bold text-content-primary">Optimizando fotos...</span>
+                            <span className="text-xs text-content-secondary mt-1">Por favor espera</span>
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+
+                    {images.map(img => (
+                        <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden border border-border-base bg-surface-secondary/20 group shadow-sm transition-all hover:shadow-md">
+                            <img
+                                src={img.previewUrl}
+                                alt="preview"
+                                className="w-full h-full object-cover"
+                            />
+
+                            <button
+                                onClick={() => handleRemove(img.id)}
+                                className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-500 backdrop-blur-sm"
+                                title="Eliminar foto"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    ))}
+
+                    {/* LÍMITE AHORA ES 10 */}
+                    {images.length < 10 && (
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-200
+                                ${isDragging
+                                    ? 'border-brand-blue bg-brand-blue/10 scale-105'
+                                    : 'border-border-base hover:bg-surface-secondary/50 hover:border-content-secondary'
+                                }
+                            `}
+                        >
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={(e) => { processFiles(e.target.files); e.target.value = ''; }}
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                            />
+
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-content-secondary mb-2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+
+                            <span className="text-xs text-content-secondary text-center px-2 font-medium">
+                                Arrastra o toca<br />
+                                <span className="opacity-70 text-[10px]">(Máx 10)</span>
+                            </span>
+                        </div>
                     )}
                 </div>
-
-                <div className="relative">
-                    <div className={`border-2 border-dashed border-border-base rounded-lg p-4 min-h-[140px] flex items-center justify-center transition-all ${processingCount > 0 ? 'bg-surface-secondary/60' : 'bg-surface-secondary/20'}`}>
-
-                        {(previews.length > 0 || processingCount > 0) ? (
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 w-full">
-                                {previews.map((src, idx) => (
-                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border-base group">
-                                        <img src={src} alt="preview" className="w-full h-full object-cover" />
-                                        <button
-                                            onClick={() => removeFile(idx)}
-                                            className="absolute top-1 right-1 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm transition-all z-10"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                ))}
-
-                                {/* Cuadros de carga individuales según el remanente */}
-                                {processingCount > 0 && Array.from({ length: processingCount }).map((_, i) => (
-                                    <div key={`loading-${i}`} className="aspect-square rounded-lg border border-dashed border-brand-blue/30 dark:border-brand-orange/30 bg-brand-blue/5 dark:bg-brand-orange/10 flex flex-col items-center justify-center animate-pulse">
-                                        <Loader2 className="animate-spin text-brand-blue dark:text-brand-orange mb-1" size={24} />
-                                        <span className="text-[10px] text-brand-blue dark:text-brand-orange font-black uppercase text-center px-1">Cargando</span>
-                                    </div>
-                                ))}
-
-                                {processingCount === 0 && (
-                                    <div className="relative aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border-base rounded-lg text-content-secondary hover:text-brand-blue dark:hover:text-brand-orange hover:border-brand-blue dark:hover:border-brand-orange transition-all cursor-pointer group">
-                                        <Camera size={20} className="group-hover:scale-110 transition-transform text-brand-blue dark:text-brand-orange" />
-                                        <span className="text-[10px] font-bold mt-1">Añadir</span>
-                                        <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center py-4 cursor-pointer relative w-full group">
-                                <div className="bg-brand-blue/10 dark:bg-brand-orange/10 p-3 rounded-full mb-2 group-hover:scale-110 transition-transform">
-                                    <Camera size={24} className="text-brand-blue dark:text-brand-orange" />
-                                </div>
-                                <span className="text-sm font-medium text-content-secondary group-hover:text-brand-blue dark:group-hover:text-brand-orange transition-colors">Toca para subir o tomar fotos</span>
-                                <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 };
 
-export default QuestionViewerPhoto; 2
+export default QuestionViewerPhoto;

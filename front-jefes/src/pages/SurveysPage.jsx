@@ -1,28 +1,29 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSurveys } from '@/api/surveys';
 import { Loader, Settings2 } from 'lucide-react';
 import SurveyCard from '../components/survey/SurveyCard';
+import { useAllSurveys, useUpdateSurvey } from '@/queries/useSurveys'; 
 
 const SurveysPage = () => {
     const navigate = useNavigate();
-    const [surveys, setSurveys] = useState([]);
-    const [loading, setLoading] = useState(true);
+    
+    // 1. Reemplazamos todos los useState y useEffect por el Hook de lectura
+    const { data: encuestasData, isLoading } = useAllSurveys(1); 
+    
+    // 2. Traemos el Hook de mutación para actualizar
+    const { mutate: updateSurveyMutation } = useUpdateSurvey();
 
-    useEffect(() => {
-        fetchSurveys();
-    }, []);
+    // Extraemos los resultados (tu API devuelve { results: [...] } o el array directo)
+    const surveys = encuestasData?.results || encuestasData || [];
 
-    const fetchSurveys = async () => {
-        try {
-            setLoading(true);
-            const data = await getAllSurveys();
-            setSurveys(data);
-        } catch (error) {
-            console.error("Error al cargar encuestas:", error);
-        } finally {
-            setLoading(false);
-        }
+    const handleToggleActive = (id, currentStatus) => {
+        updateSurveyMutation({ 
+            id, 
+            payload: { activo: !currentStatus } 
+        }, {
+            onError: () => {
+                alert("No se pudo actualizar el estado de la encuesta.");
+            }
+        });
     };
 
     return (
@@ -33,7 +34,7 @@ const SurveysPage = () => {
                 </div>
             </div>
 
-            {loading ? (
+            {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                     <Loader className="animate-spin text-brand-blue" size={40} />
                     <p className="text-content-secondary animate-pulse">Cargando encuestas...</p>
@@ -46,6 +47,7 @@ const SurveysPage = () => {
                             survey={survey}
                             onEdit={(id) => navigate(`/surveys/edit/${id}`)}
                             onViewResults={(id) => navigate(`/surveys/responses/${id}`)}
+                            onToggleActive={handleToggleActive}
                         />
                     ))}
 

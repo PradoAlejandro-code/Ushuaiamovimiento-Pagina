@@ -1,69 +1,92 @@
-import { Trash2, Camera, Save } from 'lucide-react';
+import { Trash2, Save } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
-const QuestionBuilderPhoto = ({ question, onChange, onDelete, onSave }) => {
-
+const QuestionBuilderPhoto = ({ question, grupos = [], onChange, onDelete, onSave, naked = false, className = "" }) => {
     const handleChange = (field, value) => {
         onChange({ ...question, [field]: value });
     };
 
-    return (
-        // 1. Quité 'transition-all'
-        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 group relative hover:shadow-md border-l-4 border-l-pink-500">
+    const containerClasses = naked
+        ? `w-full h-full relative group ${className}`
+        : `bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 group relative hover:shadow-md border-l-4 border-l-pink-500 ${className}`;
 
-            <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+    return (
+        <div className={containerClasses}>
+            {/* Actions (Save & Delete) */}
+            <div className={`absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 ${naked ? 'bg-surface-secondary/80 backdrop-blur-sm p-1 rounded-lg' : ''}`}>
                 {onSave && (
-                    // 2. Quité 'transition-colors'
-                    <button
-                        onClick={onSave}
-                        className="p-2 text-content-secondary hover:text-pink-500 hover:bg-pink-500/10 rounded-lg"
-                        title="Guardar cambios"
-                    >
-                        <Save size={18} />
+                    <button onClick={onSave} className="p-1.5 text-content-secondary hover:text-pink-500 hover:bg-pink-500/10 rounded-lg" title="Guardar">
+                        <Save size={14} />
                     </button>
                 )}
-                {/* 3. Quité 'transition-colors' */}
-                <button
-                    onClick={onDelete}
-                    className="p-2 text-content-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg"
-                    title="Eliminar pregunta"
-                >
-                    <Trash2 size={18} />
+                <button onClick={onDelete} className="p-1.5 text-content-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg" title="Eliminar">
+                    <Trash2 size={14} />
                 </button>
             </div>
 
-            <div className="space-y-4">
-                {/* 1. Título */}
+            <div className="space-y-3">
+                {/* 1. Título de la Pregunta */}
                 <div>
-                    <label className="block text-xs font-semibold text-pink-500 uppercase tracking-wide mb-1">
+                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-pink-500">
                         Pregunta de Foto
                     </label>
-                    {/* 4. Quité 'transition-colors' */}
                     <input
                         type="text"
-                        placeholder="Ej: Foto del frente de la casa"
-                        className="w-full text-lg font-medium text-content-primary placeholder-content-secondary/50 border-b border-border-base focus:border-pink-500 focus:outline-none py-2 bg-transparent"
+                        placeholder="Escribe tu pregunta aquí..."
+                        className="w-full text-base font-bold text-content-primary placeholder-content-secondary/30 border-b border-border-base/50 outline-none py-1 bg-transparent transition-colors focus:border-pink-500"
                         value={question.titulo || ''}
                         onChange={(e) => handleChange('titulo', e.target.value)}
                     />
                 </div>
 
-                {/* 2. Preview de Carga de Foto */}
-                <div className="border-2 border-dashed border-border-base rounded-lg p-6 flex flex-col items-center justify-center text-content-secondary bg-surface-secondary">
-                    <Camera size={32} className="mb-2 opacity-50" />
-                    <span className="text-sm font-medium">Subir Foto (Vista Previa)</span>
+                {grupos.length > 0 && (
+                    <div className="mt-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-pink-500 opacity-80">
+                            Asignar a Grupo
+                        </label>
+                        <Select
+                            value={question.grupo_id ? String(question.grupo_id) : "none"}
+                            onValueChange={(val) => handleChange('grupo_id', val === "none" ? null : val)}
+                        >
+                            <SelectTrigger className="w-full bg-surface-secondary/50 border-border-base/50 h-9">
+                                <SelectValue placeholder="-- Sin Grupo --" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">-- Sin Grupo --</SelectItem>
+                                {grupos.map(g => (
+                                    <SelectItem key={g.id} value={String(g.id)}>{g.nombre || `Grupo ${g.orden}`}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
+                {/* 2. Campo Ilustrativo (Preview) */}
+                <div className="flex justify-center items-center p-6 bg-surface-secondary/50 border border-dashed border-border-base rounded-lg text-content-secondary">
+                    <div className="text-center">
+                        <span className="block text-xl mb-1">📷</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Área de captura de foto</span>
+                    </div>
                 </div>
 
                 {/* 3. Checkbox Obligatoria */}
-                <div className="flex items-center gap-2 pt-2 border-t border-border-base">
-                    {/* 5. Quité 'transition-colors' */}
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-content-secondary hover:text-content-primary">
-                        <input
-                            type="checkbox"
-                            className="w-4 h-4 text-pink-500 rounded border-gray-300 focus:ring-pink-500 accent-pink-500"
+                <div className="flex items-center gap-2 pt-2 border-t border-border-base/50">
+                    <label className="flex items-center gap-2 cursor-pointer group/field">
+                        <Checkbox
+                            id={`obligatoria-${question.id}`}
                             checked={question.obligatoria || false}
-                            onChange={(e) => handleChange('obligatoria', e.target.checked)}
+                            onCheckedChange={(val) => handleChange('obligatoria', val)}
                         />
-                        <span>Respuesta obligatoria</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-content-secondary group-hover/field:text-content-primary transition-colors">
+                            Obligatoria
+                        </span>
                     </label>
                 </div>
             </div>

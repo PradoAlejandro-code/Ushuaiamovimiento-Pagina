@@ -1,7 +1,7 @@
 // front-empleados/src/api.js
 
 // URL Real del Backend
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.ushuaiamovimiento.com.ar';
+export const API_URL = import.meta.env.VITE_API_URL || 'https://api.ushuaiamovimiento.com.ar';
 
 export const handleResponse = async (response) => {
     // Si el token falló (401) o no tiene permiso (403)
@@ -77,10 +77,38 @@ export const submitSurvey = async (id, payload) => {
         body = JSON.stringify(payload);
     }
 
-    const response = await fetch(`${API_URL}/api/surveys/${id}/respond/`, {
-        method: 'POST',
-        headers: headers,
-        body: body
+    // Checking if it is a manual submission (has usuario_id in payload)
+    const isManual = payload instanceof FormData ? payload.has('usuario_id') : payload.usuario_id;
+    const endpointUrl = isManual ? `${API_URL}/api/surveys/${id}/respond/manual/` : `${API_URL}/api/surveys/${id}/respond/`;
+
+    try {
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: headers,
+            body: body
+        });
+        
+        // 1. Error por peso u otros.
+        if (!response.ok) {
+            if (response.status === 413) {
+                throw new Error("El archivo supera el límite de peso permitido por el servidor.");
+            }
+        }
+        
+        return handleResponse(response);
+    } catch (error) {
+        // 2. Error por falla de conexión (Se cortó el internet o el server murió)
+        if (error.name === 'TypeError' || error.message === 'Failed to fetch') {
+            throw new Error("Se perdió la conexión a internet durante la subida. Revisa tu red y vuelve a intentar sin recargar la página.");
+        } else {
+            throw error;
+        }
+    }
+};
+
+export const getUsers = async () => {
+    const response = await fetch(`${API_URL}/api/users/all/`, {
+        headers: getHeaders()
     });
     return handleResponse(response);
 };
@@ -96,6 +124,43 @@ export const extendSession = async () => {
     const response = await fetch(`${API_URL}/api/auth/extend-session/`, {
         method: 'POST',
         headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const getMyResponses = async (page = 1) => {
+    const response = await fetch(`${API_URL}/api/surveys/responses/me/?page=${page}`, {
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const getResponseDetail = async (id) => {
+    const response = await fetch(`${API_URL}/api/surveys/responses/${id}/`, {
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const getCurrentUser = async () => {
+    const response = await fetch(`${API_URL}/api/auth/me/`, {
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const getBirthdays = async (day = 'today') => {
+    const response = await fetch(`${API_URL}/api/enrollments/people/birthdays/?day=${day}`, {
+        headers: getHeaders()
+    });
+    return handleResponse(response);
+};
+
+export const deliverBirthday = async (personId, observacion = '') => {
+    const response = await fetch(`${API_URL}/api/enrollments/people/${personId}/deliver-birthday/`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ observacion })
     });
     return handleResponse(response);
 };

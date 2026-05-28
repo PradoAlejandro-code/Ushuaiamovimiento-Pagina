@@ -6,10 +6,6 @@ import re
 
 @receiver(post_save, sender=RespuestaHeader)
 def procesar_contacto_signal(sender, instance, **kwargs):
-    # Ya no procesamos en el header save directamente porque esperamos a los detalles,
-    # pero si queremos soportar actualizaciones que vengan del header, podríamos llamar a procesar_header
-    # Dejamos el pass o llamamos si es update.
-    # En la practica, el procesamiento real lo disparará el detalle.
     pass
 
 @receiver(post_save, sender=RespuestaDetalle)
@@ -23,21 +19,17 @@ def procesar_header(header):
     email_extraido = None
     dni_extraido = None
 
-    # Recorremos todos los detalles actuales del header
     for detalle in header.detalles.all():
         tipo_pregunta = detalle.pregunta.tipo
         val = detalle.valor_texto
         if not val and detalle.valor_numero is not None:
-            val = str(detalle.valor_numero) # Convertimos numero a string si hace falta
+            val = str(detalle.valor_numero) 
         
         if not val: 
             continue
-            
-        # Extracción directa basada en el tipo de pregunta
         if tipo_pregunta == Pregunta.TIPO_NOMBRE:
             nombre_extraido = val
         elif tipo_pregunta == Pregunta.TIPO_CELULAR or tipo_pregunta == Pregunta.TIPO_TELEFONO:
-             # Limpieza básica de números
             limpio = re.sub(r'[^\d+]', '', str(val))
             if limpio:
                 tel_extraido = limpio
@@ -46,9 +38,7 @@ def procesar_header(header):
         elif tipo_pregunta == Pregunta.TIPO_DNI:
             dni_extraido = val
 
-    # Solo si tenemos un celular (identificador unico) procesamos el contacto
     if tel_extraido:
-        # Truncar para asegurar que entra en el campo (max 20)
         tel_extraido = tel_extraido[:20]
         
         try:
@@ -60,17 +50,27 @@ def procesar_header(header):
             if dni_extraido:
                 defaults['dni'] = dni_extraido
 
-            # update_or_create busca por celular
             contacto, created = Contacto.objects.update_or_create(
                 celular=tel_extraido,
                 defaults=defaults
             )
-            
-            # Vinculamos al header si no estaba
+          
             if header.contacto != contacto:
                 header.contacto = contacto
                 header.save(update_fields=['contacto'])
+                
+            nuevos_tags = []
+            if header.seccion:
+                nuevos_tags.append(header.seccion)
+            if header.barrio:
+                nuevos_tags.append(header.barrio)
+            if header.encuesta and header.encuesta.nombre:
+                nuevos_tags.append(header.encuesta.nombre)
+                
+            if nuevos_tags:
+                contacto.tag = ", ".join([nt.strip() for nt in nuevos_tags])
+                contacto.save(update_fields=['tag'])
+
         except Exception as e:
             print(f"Error procesando contacto en signal: {e}")
-            # No re-lanzamos la excepción para no romper el guardado de la respuesta
             pass

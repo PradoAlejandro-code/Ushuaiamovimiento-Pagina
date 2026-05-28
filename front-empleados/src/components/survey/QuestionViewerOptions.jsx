@@ -1,22 +1,30 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, CircleAlert } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardAction } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const QuestionViewerOptions = ({ question, value, onChange }) => {
     return (
-        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 hover:shadow-md transition-all border-l-4 border-l-purple-500 dark:border-l-purple-400">
-            <div className="space-y-4">
-                {/* 1. Título */}
-                <div>
-                    <label className="block text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide mb-1">
-                        {question.obligatoria
-                            ? (question.permite_multiple ? "Selección Múltiple *" : "Selección Única *")
-                            : (question.permite_multiple ? "Selección Múltiple" : "Selección Única")}
-                    </label>
-                    <h3 className="text-lg font-medium text-content-primary">
-                        {question.titulo}
-                    </h3>
-                </div>
+        <Card className="mb-4 relative border border-border-base border-l-4 border-l-purple-500 dark:border-l-purple-400 shadow-sm">
+            <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+                    {question.obligatoria
+                        ? (question.permite_multiple ? "Selección Múltiple *" : "Selección Única *")
+                        : (question.permite_multiple ? "Selección Múltiple" : "Selección Única")}
+                </CardDescription>
+                <CardTitle className="text-lg font-medium text-content-primary">
+                    {question.titulo}
+                </CardTitle>
+                {question.obligatoria && (
+                    <CardAction>
+                        <div className="text-red-500 mt-1" title="Pregunta Obligatoria">
+                            <CircleAlert size={20} />
+                        </div>
+                    </CardAction>
+                )}
+            </CardHeader>
 
-                {/* 2. Opciones */}
+            <CardContent>
                 {question.permite_multiple ? (
                     <div className="space-y-2">
                         {question.opciones && question.opciones.map((op, idx) => {
@@ -35,41 +43,32 @@ const QuestionViewerOptions = ({ question, value, onChange }) => {
 
                             return (
                                 <label key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-border-base bg-surface-secondary cursor-pointer hover:bg-surface-primary transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 text-purple-500 rounded border-gray-300 focus:ring-purple-500 accent-purple-500"
+                                    <Checkbox
                                         checked={isChecked}
-                                        onChange={(e) => handleCheckboxChange(op, e.target.checked)}
+                                        onCheckedChange={(checked) => handleCheckboxChange(op, checked)}
+                                        className={`w-5 h-5 border-gray-300 ${isChecked ? '!bg-purple-500 !border-purple-500 !text-white' : ''}`}
                                     />
-                                    <span className="text-content-primary text-base">{op}</span>
+                                    <span className="text-content-primary text-base leading-none">{op}</span>
                                 </label>
                             );
                         })}
                     </div>
                 ) : (
-                    <div className="relative">
-                        <select
-                            className="w-full text-base p-3 pr-10 rounded-lg border border-border-base bg-surface-secondary text-content-primary focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none transition-all appearance-none cursor-pointer placeholder-content-secondary"
-                            value={value || ''}
-                            onChange={(e) => onChange(e.target.value)}
-                            required={question.obligatoria}
-                        >
-                            <option value="" className="text-content-secondary">Seleccione una opción...</option>
+                    <Select value={value || undefined} onValueChange={(val) => onChange(val)} required={question.obligatoria}>
+                        <SelectTrigger className="w-full text-base p-3 h-auto rounded-lg border border-border-base bg-surface-secondary text-content-primary focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none transition-all cursor-pointer">
+                            <SelectValue placeholder="Seleccione una opción..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-surface-primary border-border-base">
                             {question.opciones && question.opciones.map((op, idx) => (
-                                <option key={idx} value={op} className="bg-surface-primary text-content-primary">
+                                <SelectItem key={idx} value={op} className="text-content-primary cursor-pointer focus:bg-surface-secondary">
                                     {op}
-                                </option>
+                                </SelectItem>
                             ))}
-                        </select>
-
-                        {/* Flecha personalizada */}
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-content-secondary">
-                            <ChevronDown size={20} />
-                        </div>
-                    </div>
+                        </SelectContent>
+                    </Select>
                 )}
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 };
 

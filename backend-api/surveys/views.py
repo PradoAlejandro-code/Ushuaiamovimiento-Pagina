@@ -10,11 +10,11 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.db.models.functions import TruncDate, TruncMonth, TruncYear
-from .models import Encuesta, Pregunta, RespuestaHeader, RespuestaDetalle, Seccion, Barrio, RespuestaFoto
+from .models import Encuesta, Pregunta, RespuestaHeader, RespuestaDetalle, Seccion, Barrio, RespuestaFoto, Grupo
 
 User = get_user_model()
 from .serializers import ( EncuestaCreateSerializer, EncuestaDetailSerializer, RespuestaCreateSerializer, SeccionSerializer, PreguntaSerializer, 
-RecentResponseSerializer, RespuestaFullSerializer, RespuestaUpdateSerializer)
+RecentResponseSerializer, RespuestaFullSerializer, RespuestaUpdateSerializer, RespuestaListSerializer, GrupoSerializer)
 
 class PreguntaDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Pregunta.objects.all()
@@ -30,10 +30,21 @@ class PreguntaCreateView(generics.CreateAPIView):
     serializer_class = PreguntaSerializer
     permission_classes = [IsAuthenticated]
 
+class GrupoCreateView(generics.CreateAPIView):
+    queryset = Grupo.objects.all()
+    serializer_class = GrupoSerializer
+    permission_classes = [IsAuthenticated]
+
+class GrupoDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Grupo.objects.all()
+    serializer_class = GrupoSerializer
+    permission_classes = [IsAuthenticated]
+
 class SeccionListView(generics.ListAPIView):
     queryset = Seccion.objects.all()
     serializer_class = SeccionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
 class EncuestaCreateView(generics.CreateAPIView):
     queryset = Encuesta.objects.all()
@@ -45,7 +56,7 @@ class EncuestaActiveListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Encuesta.objects.filter(activo=True)
+        return Encuesta.objects.filter(activo=True).order_by('-id')
 
 
 
@@ -69,7 +80,6 @@ class RespuestaCreateView(APIView):
 
     def post(self, request, pk):
         import json
-        import traceback
         
         try:
             encuesta = get_object_or_404(Encuesta, pk=pk)
@@ -82,11 +92,7 @@ class RespuestaCreateView(APIView):
                 
                 if not raw_json:
                     return Response({
-                        "error": "Falta el campo 'data' en la petición multipart.",
-                        "debug_info": {
-                            "post_keys": list(request.POST.keys()),
-                            "data_keys": list(request.data.keys()) if hasattr(request.data, 'keys') else "no-dict"
-                        }
+                        "error": "Falta el campo 'data' en la petición multipart."
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
                 try:
@@ -126,14 +132,11 @@ class RespuestaCreateView(APIView):
                         except ValueError:
                             pass
                     
-                    valor_foto = None
-                                
                     detalle = RespuestaDetalle.objects.create(
                         header=header,
                         pregunta=pregunta,
                         valor_texto=valor_texto,
-                        valor_numero=valor_numero,
-                        valor_foto=valor_foto
+                        valor_numero=valor_numero
                     )
                     
                     if is_multipart:
@@ -144,8 +147,12 @@ class RespuestaCreateView(APIView):
                                 if f.size > 0:
                                     try:
                                         RespuestaFoto.objects.create(detalle=detalle, imagen=f)
-                                    except Exception as img_err:
-                                        print(f"Error saving image: {img_err}")
+                                        # Actualizamos el valor_texto del detalle para que el frontend sepa que hay contenido
+                                        if not detalle.valor_texto:
+                                            detalle.valor_texto = f"[Foto: {f.name}]"
+                                            detalle.save()
+                                    except Exception:
+                                        pass
 
                 fecha_custom = data.get('fecha_custom')
                 if fecha_custom:
@@ -157,12 +164,117 @@ class RespuestaCreateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            tb = traceback.format_exc()
-            print(tb) 
             return Response({
                 "error": "Error interno al guardar la respuesta.",
-                "details": str(e),
-                "traceback": tb 
+                "details": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class RespuestaManualCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        import json
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        try:
+            encuesta = get_object_or_404(Encuesta, pk=pk)
+            
+            content_type = request.content_type or ""
+            is_multipart = 'multipart/form-data' in content_type
+            
+            if is_multipart:
+                raw_json = request.data.get('data') or request.POST.get('data')
+                
+                if not raw_json:
+                    return Response({
+                        "error": "Falta el campo 'data' en la petición multipart."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                try:
+                    parsed_data = json.loads(raw_json)
+                except Exception as je:
+                    return Response({"error": f"JSON inválido en el campo 'data': {str(je)}"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                parsed_data = request.data
+
+            # Extra details for manual injection
+            usuario_id = parsed_data.get('usuario_id')
+            fecha_manual = parsed_data.get('fecha_manual')
+            
+            if not usuario_id:
+                return Response({"error": "Falta el campo 'usuario_id'."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            try:
+                target_user = User.objects.get(id=usuario_id)
+            except User.DoesNotExist:
+                return Response({"error": "El usuario especificado no existe."}, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = RespuestaCreateSerializer(data=parsed_data)
+            
+            if serializer.is_valid():
+                data = serializer.validated_data
+                
+                header = RespuestaHeader.objects.create(
+                    encuesta=encuesta,
+                    usuario=target_user,
+                    seccion=data.get('seccion'),
+                    barrio=data.get('barrio')
+                )
+
+                respuestas_list = data.get('respuestas', [])
+                for rta in respuestas_list:
+                    pregunta_id = rta.get('pregunta_id')
+                    valor = rta.get('valor')
+                    
+                    try:
+                        pregunta = Pregunta.objects.get(id=pregunta_id, encuesta=encuesta)
+                    except Pregunta.DoesNotExist:
+                        continue 
+                    
+                    valor_texto = str(valor) if valor is not None else ""
+                    valor_numero = None
+                    if pregunta.tipo == 'numero' and valor:
+                        try:
+                            valor_numero = float(valor)
+                        except ValueError:
+                            pass
+                    
+                    detalle = RespuestaDetalle.objects.create(
+                        header=header,
+                        pregunta=pregunta,
+                        valor_texto=valor_texto,
+                        valor_numero=valor_numero
+                    )
+                    
+                    if is_multipart:
+                         file_key = f"foto_{pregunta_id}"
+                         if file_key in request.FILES:
+                            files = request.FILES.getlist(file_key)
+                            for f in files:
+                                if f.size > 0:
+                                    try:
+                                        RespuestaFoto.objects.create(detalle=detalle, imagen=f)
+                                        # Actualizamos el valor_texto del detalle para que el frontend sepa que hay contenido
+                                        if not detalle.valor_texto:
+                                            detalle.valor_texto = f"[Foto: {f.name}]"
+                                            detalle.save()
+                                    except Exception:
+                                        pass
+
+                # Set custom date
+                if fecha_manual:
+                    header.fecha_envio = fecha_manual
+                    header.save()
+
+                return Response({"message": "Respuesta manual guardada correctamente"}, status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                "error": "Error interno al guardar la respuesta manual.",
+                "details": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -172,111 +284,95 @@ class RecentResponseListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return RespuestaHeader.objects.select_related('usuario', 'encuesta').order_by('-fecha_envio')[:5]
+        return RespuestaHeader.objects.all().order_by('-fecha_envio', '-id')[:20]
 
 class EncuestaManagementListView(generics.ListAPIView):
     serializer_class = EncuestaDetailSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Encuesta.objects.filter(es_relevamiento=False).annotate(conteo_respuestas=Count('respuestas')).order_by('-fecha_creacion')
+        return Encuesta.objects.filter(es_relevamiento=False).annotate(conteo_respuestas=Count('respuestas')).order_by('-fecha_creacion', '-id')
 
 
 
 
 
 class SurveyResponseListView(generics.ListAPIView):
-    serializer_class = RespuestaFullSerializer
+    serializer_class = RespuestaListSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         encuesta_id = self.kwargs['encuesta_id']
-        return RespuestaHeader.objects.filter(encuesta_id=encuesta_id).prefetch_related('detalles').order_by('-fecha_envio')
+        queryset = RespuestaHeader.objects.filter(encuesta_id=encuesta_id)\
+            .select_related('usuario', 'contacto')
 
-class ExportarEncuestaCompletaView(APIView):
+        # Filtros
+        # Soportamos tanto 'seccion' como 'seccion[]' por cómo Axios serializa los arrays
+        secciones = self.request.query_params.getlist('seccion') or self.request.query_params.getlist('seccion[]')
+        barrios = self.request.query_params.getlist('barrio') or self.request.query_params.getlist('barrio[]')
+        
+        fecha_desde = self.request.query_params.get('fecha_desde')
+        fecha_hasta = self.request.query_params.get('fecha_hasta')
+        usuario_id = self.request.query_params.get('usuario')
+        search_id = self.request.query_params.get('id')
+
+        if secciones:
+            queryset = queryset.filter(seccion__in=secciones)
+        if barrios:
+            queryset = queryset.filter(barrio__in=barrios)
+        if fecha_desde:
+             # Asumiendo formato YYYY-MM-DD
+            queryset = queryset.filter(fecha_envio__date__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_envio__date__lte=fecha_hasta)
+        if usuario_id:
+            queryset = queryset.filter(usuario_id=usuario_id)
+        if search_id:
+            queryset = queryset.filter(id=search_id)
+
+        if self.request.query_params.get('ordering'):
+            queryset = queryset.order_by(self.request.query_params.get('ordering'))
+        else:
+            queryset = queryset.order_by('-fecha_envio', '-id')
+
+        return queryset
+
+class MyResponsesListView(generics.ListAPIView):
+    serializer_class = RespuestaListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return RespuestaHeader.objects.filter(usuario=self.request.user).order_by('-id')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+class SurveyRespondentsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        encuesta = get_object_or_404(Encuesta, pk=pk)
+        respondents = User.objects.filter(
+            encuestas_respondidas__encuesta_id=pk
+        ).distinct().values('id', 'username', 'first_name', 'last_name')
         
-        zip_buffer = io.BytesIO()
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            preguntas = encuesta.preguntas.filter(activa=True).order_by('orden')
-            headers_static = ['ID Respuesta', 'Fecha', 'Usuario', 'Barrio', 'Seccion']
-            headers_dinamicos = [f"P{p.orden}: {p.titulo}" for p in preguntas]
-            
-            csv_buffer = io.StringIO()
-            writer = csv.writer(csv_buffer)
-            writer.writerow(headers_static + headers_dinamicos)
-
-            respuestas = RespuestaHeader.objects.filter(encuesta=encuesta).select_related('usuario').prefetch_related('detalles__pregunta', 'detalles__fotos_extra')
-
-            for rta in respuestas:
-                row = [
-                    rta.id,
-                    rta.fecha_envio.strftime('%Y-%m-%d %H:%M'),
-                    rta.usuario.username if rta.usuario else 'Anónimo',
-                    rta.barrio or '-',
-                    rta.seccion or '-'
-                ]
-
-                detalles_map = {d.pregunta_id: d for d in rta.detalles.all()}
-                
-                for p in preguntas:
-                    val = ""
-                    detalle = detalles_map.get(p.id)
-                    if detalle:
-                        fotos = list(detalle.fotos_extra.all())
-                        
-                        if fotos:
-                            nombres_fotos = []
-                            for idx, f in enumerate(fotos):
-                                if f.imagen and f.imagen.name:
-                                    try:
-                                        ext = f.imagen.name.split('.')[-1]
-                                        zip_filename = f"imagenes/R{rta.id}_P{p.orden}_{p.id}_{idx+1}.{ext}"
-                                        
-                                        with open(f.imagen.path, 'rb') as img_f:
-                                            zip_file.writestr(zip_filename, img_f.read())
-                                        
-                                        nombres_fotos.append(zip_filename)
-                                    except Exception as e:
-                                        nombres_fotos.append(f"ERR_IMG_{idx}: {e}")
-                            
-                            val = " | ".join(nombres_fotos)
-                            
-                        elif detalle.valor_foto:
-                            if detalle.valor_foto.name: 
-                                try:
-                                    ext = detalle.valor_foto.name.split('.')[-1]
-                                    zip_filename = f"imagenes/R{rta.id}_P{p.orden}_{p.id}.{ext}"
-                                    
-                                    with open(detalle.valor_foto.path, 'rb') as img_f:
-                                        zip_file.writestr(zip_filename, img_f.read())
-                                    
-                                    val = zip_filename
-                                except Exception as e:
-                                    val = f"ERROR_IMG: {str(e)}"
-                        else:
-                            val = detalle.valor_texto or str(detalle.valor_numero) if detalle.valor_numero is not None else ""
-                    
-                    row.append(val)
-                
-                writer.writerow(row)
-
-            zip_file.writestr('respuestas.csv', csv_buffer.getvalue())
-
-        zip_buffer.seek(0)
-        response = HttpResponse(zip_buffer, content_type='application/zip')
-        response['Content-Disposition'] = f'attachment; filename="Reporte_Completo_{encuesta.id}.zip"'
-        return response
-
+        return Response(list(respondents))
 
 class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = RespuestaHeader.objects.all()
-    serializer_class = RespuestaUpdateSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return RespuestaFullSerializer
+        return RespuestaUpdateSerializer
 
     def update(self, request, *args, **kwargs):
         import json
@@ -356,12 +452,4 @@ class RespuestaUpdateView(generics.RetrieveUpdateDestroyAPIView):
                 id__in=delete_extras, 
                 detalle__header=header
             ).delete()
-
-        delete_legacy = parse_ids('delete_legacy_detail_ids')
-        if delete_legacy:
-            RespuestaDetalle.objects.filter(
-                id__in=delete_legacy,
-                header=header
-            ).update(valor_foto=None)
-
 

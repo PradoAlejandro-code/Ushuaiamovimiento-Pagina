@@ -7,8 +7,13 @@ import SurveysPage from './pages/SurveysPage';
 import EditSurveyPage from './pages/EditSurveyPage';
 import ContactViewerPage from './pages/ContactViewerPage';
 import SurveyResponsesPage from './pages/SurveyResponsesPage';
+import ReportsPage from './pages/ReportsPage';
+import EnrollmentsPage from './pages/EnrollmentsPage';
+import NeighborsPage from './pages/NeighborsPage';
+import BirthdaysPage from './pages/BirthdaysPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { useSessionExtender } from './hooks/useSessionExtender';
+import ScrollToTop from './components/ui/ScrollToTop';
 
 // Componente que protege la ruta
 const ProtectedRoute = ({ children }) => {
@@ -65,6 +70,7 @@ function App() {
 
     return (
         <BrowserRouter>
+            <ScrollToTop />
             <Routes>
                 {/* Rutas con Sidebar */}
                 <Route element={
@@ -75,6 +81,7 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/create-survey" element={<CreateSurveyPage />} />
                     <Route path="/create-report" element={<CreateReportPage />} />
+                    <Route path="/reports" element={<ReportsPage />} />
 
                     {/* Rutas de Gestión */}
                     <Route path="/relevamiento" element={<EditSurveyPage isRelevamiento={true} />} />
@@ -84,6 +91,9 @@ function App() {
                     <Route path="/surveys/contacts/:id" element={<ContactViewerPage />} />
                     <Route path="/contacts" element={<ContactViewerPage />} />
                     <Route path="/surveys/responses/:id" element={<SurveyResponsesPage />} />
+                    <Route path="/enrollments" element={<EnrollmentsPage />} />
+                    <Route path="/neighbors" element={<NeighborsPage />} />
+                    <Route path="/birthdays" element={<BirthdaysPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

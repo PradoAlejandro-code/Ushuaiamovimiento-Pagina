@@ -12,7 +12,7 @@ class EncuestaAdmin(admin.ModelAdmin):
 
 @admin.register(RespuestaHeader)
 class RespuestaHeaderAdmin(admin.ModelAdmin):
-    list_display = ('encuesta', 'usuario', 'fecha_envio', 'seccion', 'barrio')
+    list_display = ('id', 'encuesta', 'usuario', 'fecha_envio', 'seccion', 'barrio')
 
 class BarrioInline(admin.TabularInline):
     model = Barrio

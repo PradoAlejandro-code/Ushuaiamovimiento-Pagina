@@ -1,6 +1,13 @@
 import { Sun, Moon, LogOut } from 'lucide-react';
+import { useTheme } from "next-themes";
 
-const Navbar = ({ theme, toggleTheme, logout }) => {
+const Navbar = ({ logout }) => {
+    const { theme, setTheme } = useTheme();
+
+    const toggleTheme = () => {
+        setTheme(theme === 'light' ? 'dark' : 'light');
+    };
+
     return (
         <div className="sticky top-0 z-20 bg-surface-secondary/95 backdrop-blur-sm pt-4 pb-2 flex justify-center items-center gap-3 border-b border-transparent">
             {/* Botón Theme Toggle */}

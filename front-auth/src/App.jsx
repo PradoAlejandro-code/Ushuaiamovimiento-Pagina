@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Lock, ChartBar, Loader2 } from 'lucide-react';
+import { Mail, Lock, ChartBar, Loader2, Eye, EyeOff } from 'lucide-react';
 import Card from './components/Card';
 import MyButton from './components/MyButton';
 import CheckBox from './components/CheckBox';
@@ -11,6 +11,7 @@ const bannerImage = '/mopof-banner.png';
 export default function App() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
 
     // State for logic
@@ -35,14 +36,12 @@ export default function App() {
         // Logic restored: sector.domain (e.g. barrio.ushuaiamovimiento.com.ar)
         if (isLocal) {
             // Localhost mappings
-            if (sector === 'jefe') return `http://localhost:5173?token=${token}`; // Assuming front-jefes runs on 5173 or 5174. User said 5173.
             return `http://localhost:5174?token=${token}`; // Fallback for other sectors
         }
 
         // Production: dynamic subdomain
-        // 'jefe' -> jefes.ushuaiamovimiento.com.ar
         // 'barrio' -> barrio.ushuaiamovimiento.com.ar
-        const subdomain = sector === 'jefe' ? 'jefes' : sector;
+        const subdomain = sector;
         return `https://${subdomain}.ushuaiamovimiento.com.ar?token=${token}`;
     };
 
@@ -103,7 +102,6 @@ export default function App() {
 
     // Capitalize helper
     const formatSectorName = (name) => {
-        if (name === 'jefe') return 'Panel de Jefes';
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
@@ -169,13 +167,20 @@ export default function App() {
                                             </div>
                                             <input
                                                 id="password"
-                                                type="password"
+                                                type={showPassword ? "text" : "password"}
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 placeholder="••••••••"
-                                                className="w-full pl-12 pr-4 py-3 border-0 rounded-xl placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring bg-input text-input-foreground"
+                                                className="w-full pl-12 pr-12 py-3 border-0 rounded-xl placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring bg-input text-input-foreground"
                                                 disabled={loading}
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                                            >
+                                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                            </button>
                                         </div>
                                     </div>
 

@@ -32,13 +32,13 @@ class Command(BaseCommand):
                                 img = img.convert('RGB')
                                 
                             # Resize if too large
-                            max_dimension = 1280
+                            max_dimension = 2048
                             if img.width > max_dimension or img.height > max_dimension:
                                 img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
                                 
                             # Save with optimization
                             # We save to a temp path first to verify
-                            img.save(path, quality=70, optimize=True)
+                            img.save(path, quality=90, optimize=True)
                         
                         new_size = os.path.getsize(path)
                         saved = original_size - new_size

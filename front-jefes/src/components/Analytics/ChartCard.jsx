@@ -64,7 +64,11 @@ const ChartCard = ({ dataPregunta, className, action }) => {
     const [chartData, setChartData] = useState([]);
 
     useEffect(() => {
-        if (!dataPregunta || !dataPregunta.data) return;
+        // Validación segura: si no hay data, seteamos array vacío pero no retornamos antes
+        if (!dataPregunta || !dataPregunta.data) {
+            setChartData([]);
+            return;
+        }
 
         const formattedData = dataPregunta.data.map(d => ({
             name: d.name || d.label,
@@ -74,22 +78,22 @@ const ChartCard = ({ dataPregunta, className, action }) => {
         setChartData(formattedData);
     }, [dataPregunta]);
 
-    const isUsersChart = dataPregunta.extraType === 'users';
+    const isUsersChart = dataPregunta?.extraType === 'users'; // Agregué el ? por seguridad
     const BAR_COLOR_USER = '#f97316';
     const BAR_COLOR_DEFAULT = '#3b82f6';
     const PIE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-    if (!chartData.length) return null;
+    // --- CAMBIO: Eliminé el "return null" para que la tarjeta siempre se renderice ---
 
     return (
-        <div className={`p-6 bg-surface-primary rounded-2xl border border-border-base flex flex-col ${className}`}>
+        <div className={`p-6 bg-surface-secondary rounded-2xl border border-border-base flex flex-col ${className}`}>
 
             {/* ENCABEZADO */}
             <div className="flex items-center justify-between mb-2 gap-4 h-10">
                 <div className="flex items-center gap-2 overflow-hidden">
                     {isUsersChart && <span className="w-1.5 h-6 bg-brand-orange rounded-full flex-shrink-0"></span>}
                     <h3 className="text-lg font-bold text-content-primary leading-tight truncate">
-                        {dataPregunta.titulo}
+                        {dataPregunta?.titulo || "Datos"}
                     </h3>
                 </div>
 
@@ -104,79 +108,88 @@ const ChartCard = ({ dataPregunta, className, action }) => {
                 </div>
             </div>
 
-            {/* GRÁFICO */}
+            {/* GRÁFICO O ESTADO VACÍO */}
             <div className="flex-1 w-full min-h-[300px] relative">
-                <ResponsiveContainer width="100%" height="100%">
-                    {isPie && !isUsersChart ? (
-                        <PieChart>
-                            <Pie
+                {chartData.length === 0 ? (
+                    // --- CAMBIO: Mostramos mensaje si está vacío en lugar de desaparecer ---
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <p className="text-xs font-bold text-content-secondary uppercase opacity-50">
+                            No hay datos disponibles
+                        </p>
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                        {isPie && !isUsersChart ? (
+                            <PieChart>
+                                <Pie
+                                    data={chartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    content={<CustomTooltip />}
+                                    cursor={false}
+                                    isAnimationActive={false}
+                                    wrapperStyle={{ outline: 'none' }}
+                                    allowEscapeViewBox={{ x: true, y: true }} // <--- ESTO ARREGLA EL BUG
+                                />
+                            </PieChart>
+                        ) : (
+                            <BarChart
                                 data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
+                                margin={{ top: 20, right: 0, left: -25, bottom: isUsersChart ? 5 : 0 }}
                             >
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip
-                                content={<CustomTooltip />}
-                                cursor={false}
-                                isAnimationActive={false}
-                                wrapperStyle={{ outline: 'none' }}
-                                allowEscapeViewBox={{ x: true, y: true }} // <--- ESTO ARREGLA EL BUG
-                            />
-                        </PieChart>
-                    ) : (
-                        <BarChart
-                            data={chartData}
-                            margin={{ top: 20, right: 0, left: -25, bottom: isUsersChart ? 5 : 0 }}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156, 163, 175, 0.1)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156, 163, 175, 0.1)" />
 
-                            <XAxis
-                                dataKey="name"
-                                axisLine={false}
-                                tickLine={false}
-                                interval={0}
-                                tick={isUsersChart ? <CustomTick data={chartData} /> : { fontSize: 10, fill: '#9ca3af' }}
-                                height={isUsersChart ? 70 : 30}
-                            />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    interval={0}
+                                    tick={isUsersChart ? <CustomTick data={chartData} /> : { fontSize: 10, fill: '#9ca3af' }}
+                                    height={isUsersChart ? 70 : 30}
+                                />
 
-                            <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 10, fill: '#9ca3af' }}
-                            />
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                />
 
-                            <Tooltip
-                                content={<CustomTooltip />}
-                                cursor={false}
-                                isAnimationActive={false} // Sin delay
-                                animationDuration={0}     // Sin animación
-                                allowEscapeViewBox={{ x: true, y: true }} // <--- CRÍTICO: Evita el salto al bajar el mouse
-                            />
+                                <Tooltip
+                                    content={<CustomTooltip />}
+                                    cursor={false}
+                                    isAnimationActive={false} // Sin delay
+                                    animationDuration={0}     // Sin animación
+                                    allowEscapeViewBox={{ x: true, y: true }} // <--- CRÍTICO: Evita el salto al bajar el mouse
+                                />
 
-                            <Bar
-                                dataKey="value"
-                                radius={[6, 6, 0, 0]}
-                                maxBarSize={50}
-                                animationDuration={800}
-                                animationBegin={0}
-                            >
-                                {chartData.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={isUsersChart ? BAR_COLOR_USER : BAR_COLOR_DEFAULT}
-                                    />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    )}
-                </ResponsiveContainer>
+                                <Bar
+                                    dataKey="value"
+                                    radius={[6, 6, 0, 0]}
+                                    maxBarSize={50}
+                                    animationDuration={800}
+                                    animationBegin={0}
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={isUsersChart ? BAR_COLOR_USER : BAR_COLOR_DEFAULT}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        )}
+                    </ResponsiveContainer>
+                )}
             </div>
         </div>
     );

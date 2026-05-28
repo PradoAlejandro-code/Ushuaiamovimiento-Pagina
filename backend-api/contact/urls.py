@@ -4,7 +4,6 @@ from .views import (
     ContactoDetailView, 
     ContactoImportView, 
     ContactosView, 
-    ExportarContactosCSV
 )
 
 urlpatterns = [
@@ -13,11 +12,7 @@ urlpatterns = [
     path('importar/', ContactoImportView.as_view(), name='contacto-import'),
     path('<int:pk>/', ContactoDetailView.as_view(), name='contacto-detail'),
     
-    # Analysis/Export endpoints
+    # Analysis endpoints
     path('all/', ContactosView.as_view(), name='all-contacts'),
-    path('all/exportar-csv/', ExportarContactosCSV.as_view(), name='all-contacts-export'),
-    
-    # Encuesta specific endpoints (moved logic here, might need param handling)
     path('encuesta/<int:encuesta_id>/', ContactosView.as_view(), name='survey-contacts'),
-    path('encuesta/<int:encuesta_id>/exportar-csv/', ExportarContactosCSV.as_view(), name='survey-export-csv'),
 ]

@@ -4,11 +4,14 @@ import { ChevronLeft, ChevronRight, X, Maximize2, Trash2 } from 'lucide-react';
 export default function ImageCarousel({
     images,
     onDelete, // (id, isLegacy) => void. Si se pasa, muestra botón borrar.
-    readOnly = false
+    readOnly = false,
+    initialIndex = 0,
+    className = "max-w-md",
+    disableLightbox = false
 }) {
     if (!images || images.length === 0) return null;
 
-    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(initialIndex);
     const [lightboxOpen, setLightboxOpen] = useState(false);
 
     const handlePrev = (e) => {
@@ -33,11 +36,11 @@ export default function ImageCarousel({
     };
 
     return (
-        <div className="relative group w-full max-w-md mx-auto">
+        <div className={`relative group w-full mx-auto ${className}`}>
             {/* Main Image Card */}
             <div
-                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-black/5 aspect-[4/3] cursor-pointer`}
-                onClick={() => setLightboxOpen(true)}
+                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-black/5 aspect-[4/3] ${disableLightbox ? 'cursor-default' : 'cursor-pointer'}`}
+                onClick={() => !disableLightbox && setLightboxOpen(true)}
             >
                 <img
                     src={getSecureUrl(currentImage.url)}
@@ -46,7 +49,7 @@ export default function ImageCarousel({
                 />
 
                 {/* Overlay Controls */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-between p-2">
+                <div className="absolute inset-0 bg-transparent flex items-center justify-between p-2">
                     {images.length > 1 && (
                         <>
                             <button

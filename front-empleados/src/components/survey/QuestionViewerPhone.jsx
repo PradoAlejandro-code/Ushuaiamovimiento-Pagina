@@ -1,5 +1,5 @@
-import React from 'react';
-import { Phone } from 'lucide-react';
+import { Phone, CircleAlert } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardAction } from "@/components/ui/card";
 
 const QuestionViewerPhone = ({ question, value, onChange }) => {
 
@@ -15,21 +15,25 @@ const QuestionViewerPhone = ({ question, value, onChange }) => {
     const initialValue = value || '+54 ';
 
     return (
-        <div className="bg-surface-primary p-6 rounded-xl shadow-sm border border-border-base mb-4 hover:shadow-md transition-all border-l-4 border-l-green-500 dark:border-l-green-400">
+        <Card className="mb-4 relative border border-border-base border-l-4 border-l-green-500 dark:border-l-green-400 shadow-sm">
+            <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide flex items-center gap-1">
+                    <Phone size={12} />
+                    {question.obligatoria ? "Teléfono Requerido *" : "Teléfono Opcional"}
+                </CardDescription>
+                <CardTitle className="text-lg font-medium text-content-primary">
+                    {question.titulo}
+                </CardTitle>
+                {question.obligatoria && (
+                    <CardAction>
+                        <div className="text-red-500 mt-1" title="Pregunta Obligatoria">
+                            <CircleAlert size={20} />
+                        </div>
+                    </CardAction>
+                )}
+            </CardHeader>
 
-            <div className="space-y-4">
-                {/* 1. Título */}
-                <div>
-                    <label className="block text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide mb-1 flex items-center gap-1">
-                        <Phone size={12} />
-                        {question.obligatoria ? "Teléfono Requerido *" : "Teléfono Opcional"}
-                    </label>
-                    <h3 className="text-lg font-medium text-content-primary">
-                        {question.titulo}
-                    </h3>
-                </div>
-
-                {/* 2. Campo de Respuesta Flexible */}
+            <CardContent>
                 <div className="flex gap-2">
                     <input
                         type="tel"
@@ -40,8 +44,8 @@ const QuestionViewerPhone = ({ question, value, onChange }) => {
                         required={question.obligatoria}
                     />
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 };
 

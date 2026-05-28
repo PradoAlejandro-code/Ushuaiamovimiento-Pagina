@@ -7,6 +7,12 @@ from rest_framework import serializers
 from .models import User
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = user.role
+        return token
+
     def validate(self, attrs):
         email = attrs.get("email")
         password = attrs.get("password")
@@ -29,8 +35,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['email'] = user.email
         accesos = []
 
-        if user.role == User.JEFE:
-            accesos.append('jefe') 
         for group in user.groups.all():
             if group.name.startswith('sector_'):
                 nombre_limpio = group.name.replace('sector_', '')
@@ -46,4 +50,4 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role']
+        fields = ['id', 'username', 'email', 'role', 'profile_picture']

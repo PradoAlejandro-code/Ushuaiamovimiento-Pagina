@@ -22,7 +22,6 @@ class CustomUserAdmin(ImageCroppingMixin, UserAdmin):
     def circular_preview(self, obj):
         if obj.profile_picture:
             try:
-                # Use the manual crop coordinates for the preview
                 thumbnail_options = {
                     'size': (50, 50),
                     'box': obj.cropping,
@@ -32,7 +31,6 @@ class CustomUserAdmin(ImageCroppingMixin, UserAdmin):
                 url = get_thumbnailer(obj.profile_picture).get_thumbnail(thumbnail_options).url
                 return format_html('<img src="{}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid #ccc;" />', url)
             except Exception:
-                # Fallback if cropping fails or image invalid
                 return format_html('<img src="{}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />', obj.profile_picture.url)
         return "-"
     circular_preview.short_description = 'Avatar'

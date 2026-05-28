@@ -1,21 +1,22 @@
 from django.urls import path
-from metrics.views import GlobalStatsView
 from .views import (
     EncuestaCreateView, 
     EncuestaActiveListView, 
     EncuestaDetailView, 
     RespuestaCreateView,
+    RespuestaManualCreateView,
     SeccionListView,
     PreguntaDetailView,
     PreguntaCreateView,
+    GrupoCreateView,
+    GrupoDetailView,
     EncuestaManagementListView,
     RecentResponseListView,
     SurveyResponseListView,
-    ExportarEncuestaCompletaView,
     RelevamientoDetailView,
-    RelevamientoDetailView,
-    RelevamientoDetailView,
-    RespuestaUpdateView
+    RespuestaUpdateView,
+    SurveyRespondentsView,
+    MyResponsesListView
 )
 
 urlpatterns = [
@@ -25,18 +26,20 @@ urlpatterns = [
     path('relevamiento/', RelevamientoDetailView.as_view(), name='relevamiento-detail'),
     path('<int:pk>/', EncuestaDetailView.as_view(), name='encuesta-detail'),
     path('<int:pk>/respond/', RespuestaCreateView.as_view(), name='encuesta-respond'),
+    path('<int:pk>/respond/manual/', RespuestaManualCreateView.as_view(), name='encuesta-respond-manual'),
+    path('<int:pk>/respondents/', SurveyRespondentsView.as_view(), name='survey-respondents'),
     path('<int:encuesta_id>/respuestas/', SurveyResponseListView.as_view(), name='survey-responses-list'),
-    path('stats/global/', GlobalStatsView.as_view(), name='global-stats'),
     path('locations/', SeccionListView.as_view(), name='location-list'),
     path('responses/recent/', RecentResponseListView.as_view(), name='response-list-recent'),
+    path('responses/me/', MyResponsesListView.as_view(), name='my-responses-list'),
 
-
-    # Exportación Completa (Zip)
-    path('<int:pk>/exportar-completo/', ExportarEncuestaCompletaView.as_view(), name='encuesta-export-full'),
 
     # Endpoints para Preguntas (Edición)
     path('preguntas/create/', PreguntaCreateView.as_view(), name='pregunta-create'),
     path('preguntas/<int:pk>/', PreguntaDetailView.as_view(), name='pregunta-detail'),
+    # Endpoints para Grupos
+    path('grupos/create/', GrupoCreateView.as_view(), name='grupo-create'),
+    path('grupos/<int:pk>/', GrupoDetailView.as_view(), name='grupo-detail'),
     # Endpoints para Respuestas (Edición)
     path('responses/<int:pk>/', RespuestaUpdateView.as_view(), name='respuesta-update'),
 ]

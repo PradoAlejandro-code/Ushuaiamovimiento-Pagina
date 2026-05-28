@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SurveyViewer from "./pages/SurveyViewer";
 import Home from "./pages/Home";
+import CarpetaPage from "./pages/CarpetaPage";
+import CumplesPage from "./pages/CumplesPage";
+import MainLayout from "./components/layout/MainLayout";
 import { useSessionExtender } from './hooks/useSessionExtender';
 
 // 1. Ruta Protegida (El Guardia)
@@ -51,12 +54,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas del Empleado */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        } />
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route path="/" element={<Home />} />
+          <Route path="/carpeta" element={<CarpetaPage />} />
+          <Route path="/cumpleanos" element={<CumplesPage />} />
+        </Route>
 
         <Route path="/encuesta/:id" element={
           <ProtectedRoute>

@@ -3,7 +3,7 @@ import Card from '../ui/Card';
 import MyButton from '../ui/MyButton';
 import { Edit3, BarChart2, Calendar } from 'lucide-react';
 
-const SurveyCard = ({ survey, onEdit, onViewResults }) => {
+const SurveyCard = ({ survey, onEdit, onViewResults, onToggleActive }) => {
     return (
         <Card className="flex flex-col h-full justify-between hover:border-brand-blue/50 transition-colors duration-300">
             <div>
@@ -11,11 +11,21 @@ const SurveyCard = ({ survey, onEdit, onViewResults }) => {
                     <h3 className="text-lg font-bold text-content-primary leading-tight">
                         {survey.nombre}
                     </h3>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`w-2.5 h-2.5 rounded-full ${survey.activo ? 'bg-green-500' : 'bg-gray-400'}`} />
+
+                    {/* SWITCH ACTIVO/PAUSADO */}
+                    <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">
-                            {survey.activo ? 'Activa' : 'Pausada'}
+                            {survey.activo ? 'ACTIVA' : 'PAUSADA'}
                         </span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={survey.activo}
+                                onChange={() => onToggleActive && onToggleActive(survey.id, survey.activo)}
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-blue/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                        </label>
                     </div>
                 </div>
 
